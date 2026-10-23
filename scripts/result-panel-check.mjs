@@ -150,6 +150,13 @@ try {
     .locator(".result-selected-question")
     .innerText();
 
+  await page
+    .locator(".result-panel")
+    .getByRole("button", { name: "生成结果" })
+    .click();
+  await page.locator(".result-answer-message").waitFor({ timeout: 10000 });
+  const generatedAnswer = await page.locator(".result-textarea").inputValue();
+
   await page.locator(".result-textarea").fill("新的结果正文，带一个中间机制。");
   await page.getByRole("button", { name: "保存正文" }).click();
   await page.locator(".result-panel").waitFor({ state: "detached" });
@@ -179,6 +186,8 @@ try {
         questionCount,
         selectedQuestion,
         selectedQuestionInDb: questionState.node?.selected_question ?? null,
+        generatedAnswer,
+        generatedAnswerLength: generatedAnswer.length,
         savedContent: afterSave.node?.content ?? null,
         savedQuestion: afterSave.node?.selected_question ?? null,
         documentCount: afterExport.docs.length,

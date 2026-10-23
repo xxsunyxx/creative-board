@@ -189,8 +189,41 @@ ${buildContextBrief(context)}
 只输出 JSON。`;
 }
 
-export function buildDocumentSystemPrompt() {
-  return `你是研究文档作者。给定一个结果节点和它的上游论证材料，写一篇完整的 Markdown 文档。
+export function buildAnswerSystemPrompt() {
+  return `你是结果推理器。给定一个结果节点、一个选定问题和上游材料，写出一个新的结果草稿。
+
+要求：
+- 直接回答问题，不要写「根据问题」「围绕这个问题」这类开场。
+- 保留现有结果中仍然成立的部分；如果新结论改变了原判断，明确说清改变在哪里。
+- 至少经过一个中间机制或条件，不要直接喊结论；避免「必然」「任何一种」「所有」这类绝对化表达。
+- 不编造具体数据、引用、人物或案例；不确定就写「可能」「取决于」。
+- 200-500 字，1-2 段自然中文；不要小标题、不要项目符号。
+- 不要出现「维度」「入线」「出线」「关系类型」这些系统词，也不要原样复述维度短语。
+- 只输出一个 JSON 对象：
+{
+  "content": "结果草稿"
+}`;
+}
+
+export function buildAnswerUserPrompt(
+  context: InferenceContext,
+  question: string,
+) {
+  return `下面是一个结果节点和它的上游材料。请针对选定问题，写出一个新的结果草稿。
+
+${buildContextBrief(context)}
+
+## 选定问题
+${question}
+
+## 当前结果
+${context.node.content || "（当前结果还是空白）"}
+
+## 任务
+直接回答选定问题。不要复述材料清单；要说明哪个变量或条件在起作用，以及它如何改变当前结果。只输出 JSON。`;
+}
+
+export function buildDocumentSystemPrompt() {  return `你是研究文档作者。给定一个结果节点和它的上游论证材料，写一篇完整的 Markdown 文档。
 
 重要：
 - 现有结果是最终结论。不要改写它的核心判断，但要把“为什么能得到这个结论”展开。

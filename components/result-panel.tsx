@@ -39,6 +39,10 @@ export function ResultPanel({
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionError, setQuestionError] = useState("");
   const [questionTokens, setQuestionTokens] = useState<number | null>(null);
+  const [generatingAnswer, setGeneratingAnswer] = useState(false);
+  const [answerTokens, setAnswerTokens] = useState<number | null>(null);
+  const [answerMessage, setAnswerMessage] = useState("");
+  const [answerError, setAnswerError] = useState("");
 
   const handleGenerateQuestions = () => {
     void (async () => {
@@ -93,6 +97,8 @@ export function ResultPanel({
 
   const handleSelectQuestion = (question: string) => {
     setSelectedQuestion(question);
+    setAnswerMessage("");
+    setAnswerError("");
     void (async () => {
       try {
         await setNodeSelectedQuestion(nodeId, question);
@@ -101,6 +107,65 @@ export function ResultPanel({
         setQuestionError(
           error instanceof Error ? error.message : "保存问题失败",
         );
+      }
+    })();
+  };
+
+  const handleGenerateAnswer = () => {
+    if (!selectedQuestion.trim()) {
+      setAnswerError("请先选择一个候选问题");
+      return;
+    }
+
+    void (async () => {
+      const config = readAiConfig();
+
+      if (config && (!config.apiKey.trim() || !config.model.trim())) {
+        setAnswerError("请先在 AI 设置里测试连接并选择模型");
+        return;
+      }
+
+      setGeneratingAnswer(true);
+      setAnswerError("");
+      setAnswerMessage("");
+      setAnswerTokens(null);
+
+      try {
+        const response = await fetch("/api/ai/result", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nodeId,
+            question: selectedQuestion,
+            provider: config?.provider ?? "mock",
+            model: config?.model ?? "",
+            apiKey: config?.apiKey ?? "",
+          }),
+        });
+        const result = (await response.json()) as
+          | {
+              ok: true;
+              content: string;
+              usage: { totalTokens: number };
+            }
+          | { ok: false; error: string };
+
+        if (!response.ok || !result.ok) {
+          setAnswerError(
+            result.ok ? "生成结果失败" : (result.error ?? "生成结果失败"),
+          );
+          return;
+        }
+
+        setDraft(result.content);
+        setAnswerTokens(result.usage.totalTokens);
+        setAnswerMessage("已生成预览。保存正文后才会覆盖当前结果。");
+      } catch (error) {
+        setAnswerError(
+          error instanceof Error ? error.message : "生成结果失败",
+        );
+      } finally {
+        setGeneratingAnswer(false);
       }
     })();
   };
@@ -172,6 +237,27 @@ export function ResultPanel({
             <p className="result-selected-question">
               已选：{selectedQuestion}
             </p>
+          ) : null}
+          {selectedQuestion ? (
+            <div className="result-generate-row">
+              <button
+                type="button"
+                className="button-primary button-small"
+                onClick={handleGenerateAnswer}
+                disabled={generatingAnswer}
+              >
+                {generatingAnswer ? "生成中…" : "生成结果"}
+              </button>
+              {answerTokens !== null ? (
+                <span>{answerTokens} tokens</span>
+              ) : null}
+            </div>
+          ) : null}
+          {answerMessage ? (
+            <p className="result-answer-message">{answerMessage}</p>
+          ) : null}
+          {answerError ? (
+            <p className="result-question-error">{answerError}</p>
           ) : null}
           {questionTokens !== null ? (
             <p className="result-question-meta">
