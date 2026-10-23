@@ -35,6 +35,7 @@ import {
 } from "react";
 import dagre from "@dagrejs/dagre";
 import { RelationshipPicker } from "@/components/relationship-picker";
+import { ResultPanel } from "@/components/result-panel";
 import {
   deleteCanvasNode,
   saveNodeNote,
@@ -96,6 +97,7 @@ type CanvasActions = {
   saveNote: (id: string, note: string) => Promise<number>;
   deleteNode: (id: string) => void;
   insertProcess: (connectionId: string) => void;
+  openResult: (id: string) => void;
   clearContent: (id: string) => void;
   saveToInspiration: (id: string) => void;
   exportDocument: (id: string) => void;
@@ -408,6 +410,16 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
             ) : null}
           </div>
           <div className="node-footer-actions">
+            {data.role === "result" ? (
+              <button
+                type="button"
+                className="node-note-button nodrag"
+                onClick={() => actions.openResult(id)}
+                title="打开结果输出面板"
+              >
+                输出
+              </button>
+            ) : null}
             <button
               type="button"
               className="node-note-button nodrag"
@@ -1130,6 +1142,7 @@ export default function CanvasWorkspace({
   const [inferring, setInferring] = useState(false);
   const [inferMessage, setInferMessage] = useState("");
   const [inferHint, setInferHint] = useState("");
+  const [resultPanelId, setResultPanelId] = useState<string | null>(null);
   const [selectedDimension, setSelectedDimension] = useState<{
     connectionId: string;
     groupId: string;
@@ -1301,6 +1314,9 @@ export default function CanvasWorkspace({
           }
           setInferMessage(`文档已生成 · ${result.title}`);
         })();
+      },
+      openResult: (id) => {
+        setResultPanelId(id);
       },
       saveNote: async (id, note) => {
         const result = await saveNodeNote(id, note);
@@ -1831,6 +1847,17 @@ export default function CanvasWorkspace({
   const pickerContext = `${pickerSource?.data.title ?? ""} ${
     pickerTarget?.data.title ?? ""
   }`;
+  const resultNode = resultPanelId
+    ? nodes.find((node) => node.id === resultPanelId)
+    : null;
+  const resultRoleLabel = resultNode
+    ? {
+        inspiration: "灵感",
+        process: "过程",
+        result: "结果",
+        blank: "空白",
+      }[resultNode.data.role]
+    : "";
 
   return (
     <CanvasActionsContext.Provider value={actions}>
@@ -1971,6 +1998,27 @@ export default function CanvasWorkspace({
           }}
           onCancel={handleCancelPicker}
         />
+
+        {resultNode ? (
+          <ResultPanel
+            title={resultNode.data.title}
+            content={resultNode.data.content}
+            role={resultRoleLabel}
+            onSave={async (content) => {
+              await actions.updateContent(resultNode.id, content);
+              setResultPanelId(null);
+              setInferMessage("结果正文已保存");
+            }}
+            onExport={(content) => {
+              void (async () => {
+                await actions.updateContent(resultNode.id, content);
+                actions.exportDocument(resultNode.id);
+                setResultPanelId(null);
+              })();
+            }}
+            onClose={() => setResultPanelId(null)}
+          />
+        ) : null}
       </div>
     </CanvasActionsContext.Provider>
   );

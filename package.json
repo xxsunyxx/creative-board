@@ -15,6 +15,7 @@
     "check:edge": "node scripts/edge-delete-check.mjs",
     "check:dimension": "node scripts/dimension-delete-check.mjs",
     "check:note-actions": "node scripts/note-actions-check.mjs",
+    "check:result": "node scripts/result-panel-check.mjs",
     "check:m5": "node scripts/m5-check.mjs",
     "check:engine": "node scripts/engine-check.mjs",
     "check:settings": "node scripts/settings-check.mjs",
