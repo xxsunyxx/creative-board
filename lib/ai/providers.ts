@@ -33,4 +33,34 @@ export const AI_CONFIG_STORAGE_KEY = "cb-ai-config";
 export type AiConfig = {
   provider: AiProvider;
   apiKey: string;
+  model: string;
 };
+
+export function readAiConfig(): AiConfig | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(AI_CONFIG_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const stored = JSON.parse(raw) as Partial<AiConfig>;
+    if (
+      !stored.provider ||
+      !AI_PROVIDERS.some((item) => item.id === stored.provider)
+    ) {
+      return null;
+    }
+
+    return {
+      provider: stored.provider,
+      apiKey: typeof stored.apiKey === "string" ? stored.apiKey : "",
+      model: typeof stored.model === "string" ? stored.model : "",
+    };
+  } catch {
+    return null;
+  }
+}

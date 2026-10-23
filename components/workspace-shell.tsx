@@ -46,7 +46,7 @@ export function WorkspaceShell({
           <span className="brand-mark">CB</span>
           <span className="sidebar-brand-text">
             <strong>Creative Board</strong>
-            <small>M4 · 连接与维度</small>
+            <small>E1 · 角色与推理</small>
           </span>
         </Link>
 

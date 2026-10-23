@@ -53,11 +53,15 @@ import {
 } from "@/lib/actions/edges";
 import {
   createNote,
-  inferBlankNotes,
   insertProcessOnConnection,
   updateNoteContent,
   updateNoteRole,
 } from "@/lib/actions/canvas";
+import type {
+  InferencePatchDto,
+  TokenUsage,
+} from "@/lib/ai/engine/types";
+import { readAiConfig } from "@/lib/ai/providers";
 import type {
   CanvasNodeData,
   CanvasNodeType,
@@ -987,10 +991,14 @@ export default function CanvasWorkspace({
   canvasId,
   initialNodes,
   initialEdges,
+  initialCanvasTokens = 0,
+  initialLastRunId = null,
 }: {
   canvasId: string;
   initialNodes: CanvasNodeType[];
   initialEdges: DimensionEdgeType[];
+  initialCanvasTokens?: number;
+  initialLastRunId?: string | null;
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -1001,6 +1009,12 @@ export default function CanvasWorkspace({
   const [insertRole, setInsertRole] = useState<NoteRole>("blank");
   const [inferring, setInferring] = useState(false);
   const [inferMessage, setInferMessage] = useState("");
+  const [inferHint, setInferHint] = useState("");
+  const [lastRunId, setLastRunId] = useState<string | null>(
+    initialLastRunId,
+  );
+  const [lastUsage, setLastUsage] = useState<TokenUsage | null>(null);
+  const [canvasTokens, setCanvasTokens] = useState(initialCanvasTokens);
   const flowRef =
     useRef<ReactFlowInstance<CanvasNodeType, DimensionEdgeType> | null>(null);
 
@@ -1434,40 +1448,155 @@ export default function CanvasWorkspace({
     })();
   };
 
+  const applyNodePatches = (
+    patches: InferencePatchDto[],
+    useBefore = false,
+  ) => {
+    const fieldsByNode = new Map(
+      patches.map((patch) => [
+        patch.nodeId,
+        useBefore ? patch.before : patch.after,
+      ]),
+    );
+
+    setNodes((current) =>
+      current.map((node) => {
+        const fields = fieldsByNode.get(node.id);
+        return fields
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                role: fields.role,
+                title: fields.title,
+                content: fields.content,
+                roleLocked: fields.roleLocked,
+              },
+            }
+          : node;
+      }),
+    );
+  };
+
   const handleInferAll = () => {
     void (async () => {
+      const config = readAiConfig();
+
+      if (config && (!config.apiKey.trim() || !config.model.trim())) {
+        setInferMessage("请先在 AI 设置里测试连接并选择模型");
+        return;
+      }
+
+      const provider = config?.provider ?? "mock";
+      const apiKey = config?.apiKey ?? "";
+      const model = config?.model ?? "";
+
       setInferring(true);
       setInferMessage("");
+      setLastRunId(null);
+      setLastUsage(null);
 
       try {
-        const result = await inferBlankNotes(canvasId);
-        const updates = new Map(
-          result.updated.map((item) => [item.id, item]),
-        );
-
-        setNodes((current) =>
-          current.map((node) => {
-            const update = updates.get(node.id);
-            return update
-              ? {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    role: update.role,
-                    content: update.content,
-                    roleLocked: update.roleLocked,
-                  },
-                }
-              : node;
+        const response = await fetch("/api/ai/infer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            canvasId,
+            hint: inferHint.trim(),
+            provider,
+            model,
+            apiKey,
           }),
-        );
+        });
+        const result = (await response.json()) as
+          | {
+              ok: true;
+              runId: string;
+              status: "succeeded" | "partial" | "failed";
+              patches: InferencePatchDto[];
+              usage: TokenUsage;
+              canvasTokens: number;
+              errors: string[];
+            }
+          | { ok: false; error: string };
+
+        if (!response.ok || !result.ok) {
+          setInferMessage(
+            result.ok ? "推理失败" : (result.error ?? "推理失败"),
+          );
+          return;
+        }
+
+        applyNodePatches(result.patches);
+        setLastRunId(result.patches.length > 0 ? result.runId : null);
+        setLastUsage(result.usage);
+        setCanvasTokens(result.canvasTokens);
+
+        if (result.status === "failed") {
+          setInferMessage(
+            `推理失败：${result.errors[0] ?? "未知错误"}`,
+          );
+          return;
+        }
+
+        const mockLabel = provider === "mock" ? "（mock）" : "";
+        const errorLabel =
+          result.errors.length > 0
+            ? ` · ${result.errors.length} 个失败`
+            : "";
         setInferMessage(
-          result.updated.length
-            ? `已推理 ${result.updated.length} 个空便签`
+          result.patches.length > 0
+            ? `已推理 ${result.patches.length} 个空便签${mockLabel} · ${result.usage.totalTokens} tokens${errorLabel}`
             : "没有空便签",
+        );
+      } catch (error) {
+        setInferMessage(
+          error instanceof Error ? error.message : "推理失败",
         );
       } finally {
         setInferring(false);
+      }
+    })();
+  };
+
+  const handleUndoInference = () => {
+    if (!lastRunId) {
+      return;
+    }
+
+    void (async () => {
+      setInferMessage("正在撤销…");
+
+      try {
+        const response = await fetch("/api/ai/infer/undo", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ runId: lastRunId }),
+        });
+        const result = (await response.json()) as
+          | {
+              ok: true;
+              runId: string;
+              patches: InferencePatchDto[];
+              canvasTokens: number;
+            }
+          | { ok: false; error: string };
+
+        if (!response.ok || !result.ok) {
+          setInferMessage(
+            result.ok ? "撤销失败" : (result.error ?? "撤销失败"),
+          );
+          return;
+        }
+
+        applyNodePatches(result.patches, true);
+        setLastRunId(null);
+        setCanvasTokens(result.canvasTokens);
+        setInferMessage(`已撤销 ${result.patches.length} 个便签`);
+      } catch (error) {
+        setInferMessage(
+          error instanceof Error ? error.message : "撤销失败",
+        );
       }
     })();
   };
@@ -1521,16 +1650,40 @@ export default function CanvasWorkspace({
           >
             ＋ 插入
           </button>
+          <input
+            className="canvas-hint-input"
+            value={inferHint}
+            onChange={(event) => setInferHint(event.target.value)}
+            placeholder="本次提示（可选）"
+            maxLength={300}
+            title="一句话告诉 AI 这次想解决什么"
+          />
           <button
             type="button"
             className="canvas-tool canvas-infer"
             onClick={handleInferAll}
             disabled={inferring}
+            title="未配置 AI 时使用 mock 推理"
           >
             {inferring ? "推理中…" : "开始推理"}
           </button>
+          {lastRunId ? (
+            <button
+              type="button"
+              className="canvas-tool"
+              onClick={handleUndoInference}
+            >
+              撤销
+            </button>
+          ) : null}
           <span className="canvas-board-stats">
             {nodes.length} 便签 · {edges.length} 连接
+          </span>
+          <span className="canvas-token-stats">
+            {lastUsage
+              ? `本次 ${lastUsage.totalTokens} tok · `
+              : ""}
+            画布 {canvasTokens} tok
           </span>
           {inferMessage ? (
             <span className="canvas-infer-status">{inferMessage}</span>

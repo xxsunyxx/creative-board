@@ -1236,14 +1236,34 @@ button {
   z-index: 27;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  max-width: calc(100% - 360px);
-  padding: 5px 6px;
+  max-width: min(820px, calc(100% - 300px));
+  padding: 6px 7px;
   border: 1px solid #dbe3ee;
-  border-radius: 999px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.1);
+  flex-wrap: wrap;
   transform: translateX(-50%);
+}
+
+.canvas-hint-input {
+  min-width: 140px;
+  height: 30px;
+  flex: 1 1 170px;
+  padding: 0 11px;
+  border: 1px solid #dbe3ee;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 10.5px;
+}
+
+.canvas-hint-input:focus {
+  border-color: #93c5fd;
+  outline: 2px solid rgba(37, 99, 235, 0.12);
+  outline-offset: 1px;
 }
 
 .canvas-insert-select {
@@ -1295,6 +1315,13 @@ button {
 }
 
 .canvas-board-stats {
+  padding: 0 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.canvas-token-stats {
   padding: 0 4px;
   color: #94a3b8;
   font-size: 10px;
@@ -2137,6 +2164,18 @@ button {
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.settings-field select.input {
+  width: 100%;
+  min-height: 36px;
+  background: #ffffff;
+}
+
+.settings-hint {
+  color: #94a3b8;
+  font-size: 10.5px;
+  line-height: 1.45;
 }
 
 .key-row {

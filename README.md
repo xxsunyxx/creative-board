@@ -1,8 +1,8 @@
 # Creative Board
 
-一个私有的 AI 创意 / 研究工作台：灵感库收集和融合素材，画布上用连接线和维度框建立多层关系，输出节点生成结果，最后沉淀为 Markdown 文档。
+一个私有的 AI 创意 / 研究工作台：灵感库收集和融合素材，画布上用连接线、维度框和「一种便签、四种角色」建立多层关系，空便签推理补全，结果节点沉淀为 Markdown 文档。
 
-当前阶段：**M5a 节点角色与推理已通过**。下一步 M5b：结果输出与文档。
+当前阶段：**E1 推理引擎骨架已通过**。下一步 M5b：结果输出与文档。
 
 ## 本地运行
 
@@ -21,9 +21,9 @@ pnpm dev
 
 - `/inspirations`：灵感库（新增、关键词、融合、发送到画布）
 - `/canvases`：画布列表（读取 + 新建 + 节点数）
-- `/canvases/[id]`：画布详情（默认全屏、一种便签 + 四种角色、空便签推理、过程拆分、Lucky）
+- `/canvases/[id]`：画布详情（默认全屏、一种便签 + 四种角色、空便签推理、过程拆分、Lucky、撤销、本次/画布 tokens）
 - `/documents`：文档列表 + Markdown 详情
-- `/settings`：AI 设置（OpenAI / Claude / DeepSeek，Key 只存本机 localStorage）
+- `/settings`：AI 设置（OpenAI / Claude / DeepSeek，测试后选模型，Key 只存本机 localStorage）
 - `/api/health`：数据库计数
 - `/m0`：M0 画布技术验证
 
@@ -39,6 +39,7 @@ pnpm check:m2
 pnpm check:m3
 pnpm check:m4
 pnpm check:m5
+pnpm check:engine
 pnpm check:settings
 ```
 

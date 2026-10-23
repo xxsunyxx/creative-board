@@ -27,11 +27,25 @@ if (!columns.includes("role_locked")) {
   throw new Error("canvas_nodes.role_locked missing after migrations");
 }
 
+const tables = new Set(
+  db
+    .prepare("select name from sqlite_master where type = 'table'")
+    .all()
+    .map((table) => table.name),
+);
+
+for (const table of ["inference_runs", "inference_patches", "ai_usage"]) {
+  if (!tables.has(table)) {
+    throw new Error(`${table} missing after migrations`);
+  }
+}
+
 console.log(
   JSON.stringify({
     ok: true,
     migrations: files,
     canvasNodeColumns: columns.length,
+    inferenceTables: true,
   }),
 );
 

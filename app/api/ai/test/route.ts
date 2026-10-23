@@ -16,6 +16,27 @@ function sanitize(text: string, apiKey: string) {
     .trim();
 }
 
+function isChatModel(provider: AiProvider, id: string) {
+  const value = id.toLowerCase();
+
+  if (provider === "openai") {
+    const looksLikeChat =
+      value.startsWith("gpt-") ||
+      value.startsWith("chatgpt-") ||
+      /^o[1-9]/.test(value);
+    const looksLikeTool = /(embedding|moderation|tts|whisper|dall-e|image|audio|realtime|transcribe|search)/.test(
+      value,
+    );
+    return looksLikeChat && !looksLikeTool;
+  }
+
+  if (provider === "anthropic") {
+    return value.startsWith("claude-");
+  }
+
+  return !/(embedding|rerank)/.test(value);
+}
+
 export async function POST(request: Request) {
   let body: { provider?: string; apiKey?: string };
 
@@ -71,12 +92,22 @@ export async function POST(request: Request) {
       );
     }
 
-    let modelCount: number | undefined;
+    let models: string[] = [];
 
     try {
-      const data = JSON.parse(text) as { data?: unknown[] };
+      const data = JSON.parse(text) as { data?: unknown };
       if (Array.isArray(data.data)) {
-        modelCount = data.data.length;
+        models = [
+          ...new Set(
+            data.data
+              .map((item) => {
+                const row = item as { id?: unknown };
+                return typeof row.id === "string" ? row.id : "";
+              })
+              .filter(Boolean)
+              .filter((id) => isChatModel(provider, id)),
+          ),
+        ].sort();
       }
     } catch {
       // The key is valid even if the response shape is unexpected.
@@ -85,7 +116,8 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       provider,
-      modelCount,
+      models,
+      modelCount: models.length,
     });
   } catch (error) {
     const message =

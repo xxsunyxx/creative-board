@@ -38,12 +38,41 @@ try {
     .getByRole("button", { name: "保存到本机" })
     .isDisabled();
 
+  await page.route("**/api/ai/test", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        provider: "deepseek",
+        models: ["deepseek-chat", "deepseek-reasoner"],
+        modelCount: 2,
+      }),
+    });
+  });
+
+  await page.getByRole("button", { name: "DeepSeek" }).click();
+  await page.locator("#apiKey").fill("sk-mock-1234567890");
+  await page.getByRole("button", { name: "测试连接" }).click();
+  await page.getByText(/连接成功/).waitFor({ timeout: 10000 });
+  const modelEnabledAfterTest = await page.locator("#model").isEnabled();
+  const modelOptions = await page.locator("#model option").allInnerTexts();
+  await page.locator("#model").selectOption("deepseek-reasoner");
+  const saveAfterTest = await page
+    .getByRole("button", { name: "保存到本机" })
+    .isEnabled();
+  await page.getByRole("button", { name: "保存到本机" }).click();
+  const savedConfig = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem("cb-ai-config") ?? "null"),
+  );
+
   await page.evaluate(() => {
     window.localStorage.setItem(
       "cb-ai-config",
       JSON.stringify({
         provider: "deepseek",
         apiKey: "sk-local-test-1234567890",
+        model: "deepseek-chat",
       }),
     );
   });
@@ -51,6 +80,7 @@ try {
   await page.waitForTimeout(300);
 
   const loadedKey = await page.locator("#apiKey").inputValue();
+  const loadedModel = await page.locator("#model").inputValue();
   const deepseekActive = await page
     .locator(".provider-option.is-active strong")
     .innerText();
@@ -72,7 +102,12 @@ try {
       {
         providers,
         saveBeforeTest,
+        modelEnabledAfterTest,
+        modelOptions,
+        saveAfterTest,
+        savedConfig,
         loadedKey,
+        loadedModel,
         deepseekActive,
         loadedBadge,
         cleared,

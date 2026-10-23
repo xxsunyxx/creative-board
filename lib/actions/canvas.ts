@@ -1,8 +1,7 @@
 "use server";
 
-import { and, count, eq, inArray, isNull, or } from "drizzle-orm";
+import { count, eq, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { inferNoteContent } from "@/lib/ai/mock";
 import { db } from "@/lib/db";
 import {
   canvasNodes,
@@ -121,128 +120,6 @@ export async function updateNoteContent(nodeId: string, content: string) {
     .run();
 
   return { ok: true };
-}
-
-export async function inferBlankNotes(canvasId: string) {
-  if (!canvasId) {
-    return { updated: [] };
-  }
-
-  const nodes = db
-    .select()
-    .from(canvasNodes)
-    .where(
-      and(
-        eq(canvasNodes.canvasId, canvasId),
-        isNull(canvasNodes.deletedAt),
-      ),
-    )
-    .all();
-  const edges = db
-    .select()
-    .from(connections)
-    .where(eq(connections.canvasId, canvasId))
-    .all();
-  const connectionIds = edges.map((edge) => edge.id);
-  const groups =
-    connectionIds.length > 0
-      ? db
-          .select()
-          .from(dimensionGroups)
-          .where(inArray(dimensionGroups.connectionId, connectionIds))
-          .all()
-      : [];
-
-  const titleById = new Map(nodes.map((node) => [node.id, node.title]));
-  const incoming = new Map<string, typeof edges>();
-  const outgoing = new Map<string, typeof edges>();
-
-  for (const edge of edges) {
-    const inList = incoming.get(edge.toNodeId) ?? [];
-    inList.push(edge);
-    incoming.set(edge.toNodeId, inList);
-
-    const outList = outgoing.get(edge.fromNodeId) ?? [];
-    outList.push(edge);
-    outgoing.set(edge.fromNodeId, outList);
-  }
-
-  const relationByConnection = new Map<string, string[]>();
-  for (const group of groups) {
-    const list = relationByConnection.get(group.connectionId) ?? [];
-    list.push(group.relationType);
-    relationByConnection.set(group.connectionId, list);
-  }
-
-  const updated: {
-    id: string;
-    role: NoteRole;
-    content: string;
-    roleLocked: boolean;
-  }[] = [];
-
-  db.transaction((tx) => {
-    for (const node of nodes) {
-      if (node.content.trim()) {
-        continue;
-      }
-
-      const inEdges = incoming.get(node.id) ?? [];
-      const outEdges = outgoing.get(node.id) ?? [];
-      let role: NoteRole;
-
-      if (node.roleLocked && node.type !== "blank") {
-        role = node.type;
-      } else if (inEdges.length === 0 && outEdges.length === 0) {
-        role = "inspiration";
-      } else if (inEdges.length === 0) {
-        role = "inspiration";
-      } else if (outEdges.length === 0) {
-        role = "result";
-      } else {
-        role = "process";
-      }
-
-      const incomingTitles = inEdges
-        .map((edge) => titleById.get(edge.fromNodeId) ?? "")
-        .filter(Boolean);
-      const outgoingTitles = outEdges
-        .map((edge) => titleById.get(edge.toNodeId) ?? "")
-        .filter(Boolean);
-      const relationTypes = [
-        ...inEdges.flatMap(
-          (edge) => relationByConnection.get(edge.id) ?? [],
-        ),
-        ...outEdges.flatMap(
-          (edge) => relationByConnection.get(edge.id) ?? [],
-        ),
-      ];
-      const content = inferNoteContent({
-        role,
-        incomingTitles,
-        outgoingTitles,
-        relationTypes,
-      });
-
-      tx.update(canvasNodes)
-        .set({
-          type: role,
-          content,
-          updatedAt: new Date(),
-        })
-        .where(eq(canvasNodes.id, node.id))
-        .run();
-
-      updated.push({
-        id: node.id,
-        role,
-        content,
-        roleLocked: node.roleLocked,
-      });
-    }
-  });
-
-  return { updated };
 }
 
 export async function insertProcessOnConnection(connectionId: string) {

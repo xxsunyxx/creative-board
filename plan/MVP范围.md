@@ -20,8 +20,8 @@
 - **AI 生成维度**：主维度、细节维度的候选与刷新 / 回溯；M4 先用 mock。
 - **结果 / 文档**：结果节点、候选问题、结果预览、保存多篇独立文档（M5b）。
 - **文档**：文档列表、阅读 / 编辑、跳回画布。
-- **AI 设置**：OpenAI / Claude / DeepSeek；Key 只存本机 localStorage；测试通过后保存。
-- **AI 接入（M6）**：真实 provider；记录每次 token / 费用，显示「本次」和「本画布合计」。
+- **AI 设置**：OpenAI / Claude / DeepSeek；Key 只存本机 localStorage；测试后选模型保存。
+- **AI 推理（E1/E2）**：逐节点 + 拓扑波次、run / patch / 撤销、本次 / 画布 tokens；真实 provider 适配已写，待真实 key 验证。
 - **运行形态**：私有、桌面 Web、单用户。
 
 ## 可以后置

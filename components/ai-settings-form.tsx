@@ -14,6 +14,8 @@ export function AiSettingsForm() {
   const [provider, setProvider] = useState<AiProvider>("openai");
   const [apiKey, setApiKey] = useState("");
   const [showKey, setShowKey] = useState(false);
+  const [models, setModels] = useState<string[]>([]);
+  const [model, setModel] = useState("");
   const [testState, setTestState] = useState<TestState>("idle");
   const [message, setMessage] = useState("");
   const [testedFor, setTestedFor] = useState("");
@@ -37,6 +39,9 @@ export function AiSettingsForm() {
       if (typeof stored.apiKey === "string") {
         setApiKey(stored.apiKey);
       }
+      if (typeof stored.model === "string") {
+        setModel(stored.model);
+      }
       setLoaded(true);
       setSaved(true);
       setMessage("已从本机浏览器加载");
@@ -48,11 +53,16 @@ export function AiSettingsForm() {
   const credential = `${provider}:${apiKey.trim()}`;
   const canTest = apiKey.trim().length >= 10 && testState !== "testing";
   const canSave =
-    testState === "success" && testedFor === credential && apiKey.trim().length >= 10;
+    testState === "success" &&
+    testedFor === credential &&
+    apiKey.trim().length >= 10 &&
+    model.length > 0;
 
   const resetTest = (nextProvider: AiProvider, nextKey: string) => {
     setProvider(nextProvider);
     setApiKey(nextKey);
+    setModels([]);
+    setModel("");
     setTestState("idle");
     setMessage("");
     setSaved(false);
@@ -71,7 +81,7 @@ export function AiSettingsForm() {
       const result = (await response.json()) as {
         ok: boolean;
         error?: string;
-        modelCount?: number;
+        models?: string[];
       };
 
       if (!response.ok || !result.ok) {
@@ -81,12 +91,23 @@ export function AiSettingsForm() {
         return;
       }
 
+      const nextModels = Array.isArray(result.models)
+        ? result.models.filter((item) => typeof item === "string")
+        : [];
+      setModels(nextModels);
+      const nextModel =
+        nextModels.length > 0
+          ? nextModels.includes(model)
+            ? model
+            : nextModels[0]
+          : model;
+      setModel(nextModel);
       setTestState("success");
       setTestedFor(credential);
       setMessage(
-        result.modelCount
-          ? `连接成功，可用模型 ${result.modelCount} 个`
-          : "连接成功",
+        nextModels.length > 0
+          ? `连接成功，可用模型 ${nextModels.length} 个，请选择模型后保存`
+          : "连接成功，但没有拿到模型列表",
       );
     } catch (error) {
       setTestState("error");
@@ -102,7 +123,7 @@ export function AiSettingsForm() {
 
     window.localStorage.setItem(
       AI_CONFIG_STORAGE_KEY,
-      JSON.stringify({ provider, apiKey: apiKey.trim() }),
+      JSON.stringify({ provider, apiKey: apiKey.trim(), model }),
     );
     setSaved(true);
     setMessage("已保存到本机浏览器，不会写入数据库或服务端");
@@ -112,6 +133,8 @@ export function AiSettingsForm() {
     window.localStorage.removeItem(AI_CONFIG_STORAGE_KEY);
     setProvider("openai");
     setApiKey("");
+    setModels([]);
+    setModel("");
     setTestState("idle");
     setTestedFor("");
     setMessage("已清除本机配置");
@@ -125,7 +148,7 @@ export function AiSettingsForm() {
         <div className="panel-head">
           <div>
             <h2>AI Provider</h2>
-            <p>先选服务商，再粘贴 API key。测试通过后才能保存。</p>
+            <p>先选服务商、粘贴 API key；测试连接后从模型列表选模型，再保存。</p>
           </div>
           {loaded ? <span className="mock-badge">已加载本机配置</span> : null}
         </div>
@@ -170,6 +193,35 @@ export function AiSettingsForm() {
               {showKey ? "隐藏" : "显示"}
             </button>
           </div>
+        </div>
+
+        <div className="settings-field">
+          <label htmlFor="model">模型</label>
+          <select
+            id="model"
+            className="input"
+            value={model}
+            disabled={models.length === 0}
+            onChange={(event) => {
+              setModel(event.target.value);
+              setSaved(false);
+              setMessage(`已选择 ${event.target.value}，点击「保存到本机」`);
+            }}
+          >
+            {models.length === 0 ? (
+              <option value={model}>
+                {model || "先测试连接，加载模型列表"}
+              </option>
+            ) : null}
+            {models.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+          <small className="settings-hint">
+            模型列表来自 provider；选好后保存到本机。
+          </small>
         </div>
 
         <div className="settings-actions">

@@ -15,6 +15,13 @@
       "when": 1792756911877,
       "tag": "0001_fast_martin_li",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792758758983,
+      "tag": "0002_gigantic_storm",
+      "breakpoints": true
     }
   ]
 }

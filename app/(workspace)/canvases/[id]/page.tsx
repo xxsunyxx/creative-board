@@ -10,6 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import CanvasWorkspace from "@/components/canvas-workspace";
 import { db } from "@/lib/db";
+import { getCanvasTokenTotal, getLatestUndoableRunId } from "@/lib/ai/engine/run";
 import {
   canvasNodes,
   canvases,
@@ -163,6 +164,8 @@ export default async function CanvasPage({
       },
     }),
   );
+  const canvasTokens = getCanvasTokenTotal(id);
+  const lastRunId = getLatestUndoableRunId(id);
 
   return (
     <>
@@ -186,6 +189,8 @@ export default async function CanvasPage({
         canvasId={canvas.id}
         initialNodes={initialNodes}
         initialEdges={initialEdges}
+        initialCanvasTokens={canvasTokens}
+        initialLastRunId={lastRunId}
       />
     </>
   );

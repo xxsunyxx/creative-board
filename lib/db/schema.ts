@@ -234,6 +234,89 @@ export const generationHistory = sqliteTable(
   ],
 );
 
+export const inferenceRuns = sqliteTable(
+  "inference_runs",
+  {
+    id: text("id").primaryKey(),
+    canvasId: text("canvas_id")
+      .notNull()
+      .references(() => canvases.id, { onDelete: "cascade" }),
+    taskType: text("task_type", {
+      enum: ["fill_blank_notes", "generate_questions", "generate_result"],
+    })
+      .notNull()
+      .default("fill_blank_notes"),
+    status: text("status", {
+      enum: ["running", "succeeded", "partial", "failed", "cancelled"],
+    })
+      .notNull()
+      .default("running"),
+    provider: text("provider").notNull(),
+    model: text("model").notNull().default(""),
+    hint: text("hint").notNull().default(""),
+    error: text("error"),
+    startedAt: integer("started_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    index("inference_runs_canvas_idx").on(table.canvasId),
+    index("inference_runs_started_idx").on(table.startedAt),
+  ],
+);
+
+export const inferencePatches = sqliteTable(
+  "inference_patches",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => inferenceRuns.id, { onDelete: "cascade" }),
+    nodeId: text("node_id")
+      .notNull()
+      .references(() => canvasNodes.id, { onDelete: "cascade" }),
+    beforeJson: text("before_json", { mode: "json" })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    afterJson: text("after_json", { mode: "json" })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    appliedAt: integer("applied_at", { mode: "timestamp_ms" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    undoneAt: integer("undone_at", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    index("inference_patches_run_idx").on(table.runId),
+    index("inference_patches_node_idx").on(table.nodeId),
+  ],
+);
+
+export const aiUsage = sqliteTable(
+  "ai_usage",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id").references(() => inferenceRuns.id, {
+      onDelete: "set null",
+    }),
+    canvasId: text("canvas_id").references(() => canvases.id, {
+      onDelete: "cascade",
+    }),
+    kind: text("kind").notNull(),
+    provider: text("provider").notNull(),
+    model: text("model").notNull().default(""),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    totalTokens: integer("total_tokens").notNull().default(0),
+    createdAt: createdAtColumn(),
+  },
+  (table) => [
+    index("ai_usage_canvas_idx").on(table.canvasId),
+    index("ai_usage_run_idx").on(table.runId),
+  ],
+);
+
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value", { mode: "json" }).$type<unknown>(),
@@ -251,3 +334,6 @@ export type DimensionNode = typeof dimensionNodes.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type ProvenanceLink = typeof provenanceLinks.$inferSelect;
 export type GenerationHistory = typeof generationHistory.$inferSelect;
+export type InferenceRun = typeof inferenceRuns.$inferSelect;
+export type InferencePatch = typeof inferencePatches.$inferSelect;
+export type AiUsage = typeof aiUsage.$inferSelect;
