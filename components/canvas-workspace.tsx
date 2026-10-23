@@ -236,6 +236,33 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
               }
             }}
           />
+          {!data.sourceInspirationId ? (
+            <button
+              type="button"
+              className="node-action node-clear nodrag"
+            onClick={() => {
+              if (window.confirm("清空这个便签的正文？")) {
+                actions.clearContent(id);
+              }
+            }}
+            title="清空正文"
+            aria-label="清空正文"
+            disabled={!data.content.trim()}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m7 21-4-4 10-10 4 4-10 10Z" />
+              <path d="M22 21H7" />
+            </svg>
+          </button>
+          ) : null}
           <button
             type="button"
             className="node-action node-delete nodrag"
@@ -326,31 +353,6 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
           <div className="node-footer-actions">
             {!data.sourceInspirationId ? (
               <>
-                <button
-                  type="button"
-                  className="node-icon-button nodrag"
-                  title="清空正文"
-                  aria-label="清空正文"
-                  disabled={!data.content.trim()}
-                  onClick={() => {
-                    if (window.confirm("清空这个便签的正文？")) {
-                      actions.clearContent(id);
-                    }
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="m7 21-4-4 10-10 4 4-10 10Z" />
-                    <path d="M22 21H7" />
-                  </svg>
-                </button>
                 <button
                   type="button"
                   className="node-icon-button nodrag"

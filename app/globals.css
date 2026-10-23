@@ -1663,9 +1663,14 @@ button {
   height: 13px;
 }
 
-.node-action:hover {
+.node-action:hover:not(:disabled) {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.node-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
 }
 
 .canvas-resize-handle {
