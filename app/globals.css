@@ -858,6 +858,142 @@ button {
   word-break: break-word;
 }
 
+/* M2 inspiration controls */
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.panel-head p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.mock-badge {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid #dbe3ee;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.panel-note {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.merge-panel {
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.keyword-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 22px;
+  margin-top: 12px;
+}
+
+.tag-editable {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  border: 0;
+  cursor: default;
+}
+
+.tag-remove {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(29, 78, 216, 0.1);
+  color: #1d4ed8;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tag-remove:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.keyword-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.inline-form {
+  display: flex;
+  gap: 4px;
+}
+
+.input-small {
+  width: 112px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.mini-button {
+  padding: 5px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.mini-button:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.mini-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.send-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #eef2f7;
+}
+
+.select-small {
+  width: 124px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+
 @media (max-width: 1000px) {
   .workspace {
     flex-direction: column;

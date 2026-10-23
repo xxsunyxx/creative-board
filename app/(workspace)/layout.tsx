@@ -11,7 +11,7 @@ export default function WorkspaceLayout({
           <span className="brand-mark">CB</span>
           <span>
             <strong>Creative Board</strong>
-            <small>M1 · 基础骨架</small>
+            <small>M2 · 灵感库</small>
           </span>
         </Link>
 
