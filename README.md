@@ -38,6 +38,8 @@ pnpm check:m1
 pnpm check:m2
 pnpm check:m3
 pnpm check:m4
+pnpm check:edge
+pnpm check:dimension
 pnpm check:m5
 pnpm check:engine
 pnpm check:settings

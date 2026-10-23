@@ -203,6 +203,7 @@ button {
 
 .dimension-edge-path.is-selected {
   stroke-width: 4;
+  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.45));
 }
 
 .dimension-edge-base {
@@ -246,12 +247,12 @@ button {
   pointer-events: none;
 }
 
-.dimension-chip {
+.dimension-chip-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  max-width: 230px;
-  padding: 6px 9px;
+  gap: 5px;
+  max-width: 250px;
+  padding: 6px 6px 6px 9px;
   border: 1px solid #dbe3ee;
   border-radius: 999px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
@@ -268,8 +269,68 @@ button {
     background 120ms ease;
 }
 
-.dimension-chip:hover,
-.dimension-chip.is-open {
+.dimension-chip {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+
+.dimension-chip:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.dimension-chip-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.dimension-chip-wrap:hover .dimension-chip-close,
+.dimension-chip-wrap.is-selected .dimension-chip-close {
+  opacity: 1;
+}
+
+.dimension-chip-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.dimension-chip-close:focus-visible {
+  outline: 2px solid rgba(239, 68, 68, 0.35);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.dimension-chip-wrap:hover,
+.dimension-chip-wrap:focus-within,
+.dimension-chip-wrap.is-selected {
   border-color: var(--accent);
   background: #eff6ff;
   box-shadow: 0 10px 28px rgba(37, 99, 235, 0.18);
@@ -1570,10 +1631,18 @@ button {
 }
 
 .canvas-resize-handle {
-  width: 9px !important;
-  height: 9px !important;
-  border: 1px solid #ffffff !important;
-  border-radius: 3px !important;
+  width: 15px !important;
+  height: 15px !important;
+  border: 2px solid #ffffff !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.22) !important;
+}
+
+.canvas-resize-handle::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 7px;
 }
 
 .canvas-resize-line {
@@ -1676,17 +1745,25 @@ button {
 
 .canvas-handle {
   z-index: 30;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #ffffff;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  min-height: 16px;
+  border: 2.5px solid #ffffff;
   background: var(--node-color, #3b82f6);
   box-shadow: 0 0 0 3px
     color-mix(in srgb, var(--node-color, #3b82f6) 16%, transparent);
-  opacity: 0.78;
+  opacity: 0.88;
   transition:
     opacity 150ms ease,
-    box-shadow 150ms ease,
-    transform 150ms ease;
+    box-shadow 150ms ease;
+}
+
+.canvas-handle::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
 }
 
 .canvas-node:hover .canvas-handle {
@@ -1694,7 +1771,6 @@ button {
 }
 
 .canvas-handle:hover {
-  transform: scale(1.25);
   box-shadow: 0 0 0 6px
     color-mix(in srgb, var(--node-color, #3b82f6) 22%, transparent);
 }

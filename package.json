@@ -12,6 +12,8 @@
     "check:m2": "node scripts/m2-check.mjs",
     "check:m3": "node scripts/m3-check.mjs",
     "check:m4": "node scripts/m4-check.mjs",
+    "check:edge": "node scripts/edge-delete-check.mjs",
+    "check:dimension": "node scripts/dimension-delete-check.mjs",
     "check:m5": "node scripts/m5-check.mjs",
     "check:engine": "node scripts/engine-check.mjs",
     "check:settings": "node scripts/settings-check.mjs",

@@ -27,6 +27,7 @@ import {
   Fragment,
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -93,6 +94,9 @@ type CanvasActions = {
   deleteNode: (id: string) => void;
   insertProcess: (connectionId: string) => void;
   requestAddGroup: (connectionId: string) => void;
+  selectedDimension: { connectionId: string; groupId: string } | null;
+  selectDimensionChip: (connectionId: string, groupId: string) => void;
+  clearDimensionChip: () => void;
   selectDimension: (
     connectionId: string,
     groupId: string,
@@ -835,7 +839,7 @@ function DimensionEdge({
       <path
         className={`dimension-edge-path ${selected ? "is-selected" : ""}`}
         d={path}
-        style={{ stroke: `url(#${gradientId})` }}
+        style={{ stroke: selected ? "#ef4444" : `url(#${gradientId})` }}
         markerEnd={`url(#${markerId})`}
       />
       <path
@@ -874,27 +878,51 @@ function DimensionEdge({
         {groups.map((group, index) => {
           const position = chipPositions[index];
           const isOpen = openGroupId === group.id;
+          const isSelected =
+            actions.selectedDimension?.connectionId === id &&
+            actions.selectedDimension.groupId === group.id;
 
           return (
             <Fragment key={group.id}>
-              <button
-                type="button"
-                className={`dimension-chip nodrag nopan ${
-                  isOpen ? "is-open" : ""
+              <div
+                className={`dimension-chip-wrap ${
+                  isSelected ? "is-selected" : ""
                 }`}
                 style={{
                   position: "absolute",
                   transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px)`,
                   pointerEvents: "all",
                 }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setOpenGroupId(isOpen ? null : group.id);
-                }}
               >
-                <span className="chip-type">{group.relationType}</span>
-                <span className="chip-value">{selectedPath(group)}</span>
-              </button>
+                <button
+                  type="button"
+                  className={`dimension-chip nodrag nopan ${
+                    isOpen ? "is-open" : ""
+                  } ${isSelected ? "is-selected" : ""}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    actions.selectDimensionChip(id, group.id);
+                    setOpenGroupId(isOpen ? null : group.id);
+                  }}
+                >
+                  <span className="chip-type">{group.relationType}</span>
+                  <span className="chip-value">{selectedPath(group)}</span>
+                </button>
+                <button
+                  type="button"
+                  className="dimension-chip-close nodrag nopan"
+                  title="删除这个维度框"
+                  aria-label={`删除维度框 ${group.relationType}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setOpenGroupId(null);
+                    actions.deleteGroup(id, group.id);
+                    actions.clearDimensionChip();
+                  }}
+                >
+                  ×
+                </button>
+              </div>
 
               {isOpen && (
                 <div
@@ -1010,6 +1038,10 @@ export default function CanvasWorkspace({
   const [inferring, setInferring] = useState(false);
   const [inferMessage, setInferMessage] = useState("");
   const [inferHint, setInferHint] = useState("");
+  const [selectedDimension, setSelectedDimension] = useState<{
+    connectionId: string;
+    groupId: string;
+  } | null>(null);
   const [lastRunId, setLastRunId] = useState<string | null>(
     initialLastRunId,
   );
@@ -1173,6 +1205,13 @@ export default function CanvasWorkspace({
       requestAddGroup: (connectionId) => {
         setPicker({ connectionId, mode: "add" });
       },
+      selectedDimension,
+      selectDimensionChip: (connectionId, groupId) => {
+        setSelectedDimension({ connectionId, groupId });
+      },
+      clearDimensionChip: () => {
+        setSelectedDimension(null);
+      },
       selectDimension: (connectionId, groupId, dimensionId) => {
         setEdges((current) =>
           current.map((edge) => {
@@ -1230,6 +1269,9 @@ export default function CanvasWorkspace({
         })();
       },
       deleteGroup: (connectionId, groupId) => {
+        setSelectedDimension((current) =>
+          current?.groupId === groupId ? null : current,
+        );
         setEdges((current) =>
           current.map((edge) => {
             if (edge.id !== connectionId) {
@@ -1249,14 +1291,63 @@ export default function CanvasWorkspace({
         void deleteDimensionGroup(connectionId, groupId);
       },
       deleteConnection: (connectionId) => {
+        setSelectedDimension((current) =>
+          current?.connectionId === connectionId ? null : current,
+        );
         setEdges((current) =>
           current.filter((edge) => edge.id !== connectionId),
         );
         void deleteConnectionAction(connectionId);
       },
     }),
-    [setEdges, setNodes],
+    [selectedDimension, setEdges, setNodes],
   );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") {
+        return;
+      }
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          "input, textarea, select, [contenteditable='true']",
+        )
+      ) {
+        return;
+      }
+
+      if (selectedDimension) {
+        event.preventDefault();
+        event.stopPropagation();
+        actions.deleteGroup(
+          selectedDimension.connectionId,
+          selectedDimension.groupId,
+        );
+        setSelectedDimension(null);
+        return;
+      }
+
+      const selectedIds = edges
+        .filter((edge) => edge.selected)
+        .map((edge) => edge.id);
+
+      if (selectedIds.length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      for (const edgeId of selectedIds) {
+        actions.deleteConnection(edgeId);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [actions, edges, selectedDimension]);
 
   const handleConnect = (connection: FlowConnection) => {
     if (
@@ -1618,8 +1709,8 @@ export default function CanvasWorkspace({
     <CanvasActionsContext.Provider value={actions}>
       <div className="canvas-stage">
         <div className="canvas-hint">
-          拖动便签调整位置 · 四边圆点拉线 · {nodes.length} 便签 ·{" "}
-          {edges.length} 连接
+          拖动便签调整位置 · 四边圆点拉线 · 选中连线按 Delete 删除 ·{" "}
+          {nodes.length} 便签 · {edges.length} 连接
         </div>
         <button
           type="button"
@@ -1702,6 +1793,7 @@ export default function CanvasWorkspace({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           connectionMode={ConnectionMode.Loose}
+          deleteKeyCode={null}
           snapToGrid
           snapGrid={[20, 20]}
           fitView
