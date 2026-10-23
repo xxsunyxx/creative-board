@@ -16,6 +16,8 @@ const db = new Database("./data/app.db");
 const canvasId = `note-actions-${Date.now()}`;
 const aId = `note-actions-a-${Date.now()}`;
 const bId = `note-actions-b-${Date.now()}`;
+const cId = `note-actions-c-${Date.now()}`;
+const sourceId = `note-actions-source-${Date.now()}`;
 const edgeId = `note-actions-e-${Date.now()}`;
 const groupId = `note-actions-g-${Date.now()}`;
 const dimId = `note-actions-d-${Date.now()}`;
@@ -54,6 +56,41 @@ for (const [id, title, content, role, x] of [
     createdAt,
   );
 }
+
+db.prepare(
+  "insert into inspirations (id,title,content,origin,status,created_at,updated_at) values (?,?,?,?,?,?,?)",
+).run(
+  sourceId,
+  "灵感来源卡片",
+  "来自灵感库的内容",
+  "manual",
+  "active",
+  createdAt,
+  createdAt,
+);
+db.prepare(
+  `insert into canvas_nodes
+   (id, canvas_id, type, role_locked, source_inspiration_id, title, content, weight, color, note, status, x, y, width, height, created_at, updated_at)
+   values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+).run(
+  cId,
+  canvasId,
+  "inspiration",
+  1,
+  sourceId,
+  "灵感来源卡片",
+  "来自灵感库的内容",
+  5,
+  "#8b5cf6",
+  "",
+  "draft",
+  100,
+  480,
+  280,
+  200,
+  createdAt,
+  createdAt,
+);
 
 db.prepare(
   "insert into connections (id, canvas_id, from_node_id, to_node_id, created_at) values (?,?,?,?,?)",
@@ -105,6 +142,17 @@ try {
   await page.waitForTimeout(500);
 
   const iconCount = await page.locator(".node-icon-button").count();
+  const sourceNode = page
+    .locator(".react-flow__node")
+    .filter({
+      has: page
+        .locator(".canvas-node-title")
+        .filter({ hasText: /^灵感来源卡片$/ }),
+    })
+    .first();
+  const sourceIconCount = await sourceNode
+    .locator(".node-icon-button")
+    .count();
   const note = page
     .locator(".react-flow__node")
     .filter({
@@ -149,6 +197,7 @@ try {
     JSON.stringify(
       {
         iconCount,
+        sourceIconCount,
         afterSave: Boolean(afterSave.inspiration),
         savedInspirationId,
         afterSaveAgainDocumentCount: afterSaveAgain.documents.length,
@@ -174,6 +223,7 @@ try {
       .run(exportedDocumentId);
   }
   cleanup.prepare("delete from documents where title = ?").run("导出测试");
+  cleanup.prepare("delete from inspirations where id = ?").run(sourceId);
   if (savedInspirationId) {
     cleanup
       .prepare("delete from inspirations where id = ?")
