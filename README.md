@@ -40,6 +40,7 @@ pnpm check:m3
 pnpm check:m4
 pnpm check:edge
 pnpm check:dimension
+pnpm check:note-actions
 pnpm check:m5
 pnpm check:engine
 pnpm check:settings

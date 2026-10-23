@@ -31,7 +31,7 @@ export default function DocumentsPage() {
           <p className="page-kicker">Documents</p>
           <h1 className="page-title">文档</h1>
           <p className="page-subtitle">
-            输出节点保存后的成稿会出现在这里。M1 先用种子文档验证读取链路。
+            从画布便签导出的完整文档会出现在这里。
           </p>
         </div>
         <div className="stat-row">
@@ -51,7 +51,7 @@ export default function DocumentsPage() {
               <div className="card-top">
                 <span className="status-pill status-active">Markdown</span>
                 <span className="origin-pill">
-                  {row.outputNodeId ? "来自输出节点" : "种子文档"}
+                  {row.outputNodeId ? "来自画布便签" : "种子文档"}
                 </span>
               </div>
               <h2>

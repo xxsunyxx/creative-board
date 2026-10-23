@@ -39,7 +39,7 @@ export default async function DocumentPage({
           <h1 className="page-title">{document.title}</h1>
           <p className="page-subtitle">
             更新于 {formatDate(document.updatedAt)}
-            {document.outputNodeId ? " · 来自输出节点" : " · 种子文档"}
+            {document.outputNodeId ? " · 来自画布便签" : " · 种子文档"}
           </p>
         </div>
       </header>

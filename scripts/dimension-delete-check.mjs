@@ -102,6 +102,7 @@ try {
 
   const chipsBefore = await page.locator(".dimension-chip").count();
   const closeButtons = await page.locator(".dimension-chip-close").count();
+
   const handleSize = await page
     .locator(".canvas-handle")
     .first()
@@ -114,9 +115,34 @@ try {
         rendered: `${box.width}x${box.height}`,
       };
     });
+  await page.locator(".canvas-handle").first().hover();
+  await page.waitForTimeout(180);
+  const handleSizeHover = await page
+    .locator(".canvas-handle")
+    .first()
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { width: style.width, height: style.height };
+    });
 
   await page.locator(".react-flow__node").first().click();
   await page.waitForTimeout(200);
+  const resizeBase = await page
+    .locator(".canvas-resize-handle")
+    .first()
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { width: style.width, height: style.height };
+    });
+  await page.locator(".canvas-resize-handle").first().hover();
+  await page.waitForTimeout(180);
+  const resizeHover = await page
+    .locator(".canvas-resize-handle")
+    .first()
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { width: style.width, height: style.height };
+    });
   await page.screenshot({
     path: "C:\\temp\\opencode\\handles.png",
     fullPage: true,
@@ -154,6 +180,9 @@ try {
         chipsBefore,
         closeButtons,
         handleSize,
+        handleSizeHover,
+        resizeBase,
+        resizeHover,
         chipsAfterClose,
         groupsAfterClose,
         selectedAfterClick,

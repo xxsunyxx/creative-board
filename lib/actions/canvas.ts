@@ -1,13 +1,19 @@
 "use server";
 
-import { count, eq, or } from "drizzle-orm";
+import { and, count, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { extractKeywords } from "@/lib/ai/mock";
 import { db } from "@/lib/db";
 import {
   canvasNodes,
+  canvases,
   connections,
   dimensionGroups,
+  dimensionNodes,
+  documents,
+  inspirationKeywords,
   inspirationNotes,
+  inspirations,
 } from "@/lib/db/schema";
 import type { NoteRole } from "@/lib/canvas-types";
 
@@ -382,4 +388,259 @@ export async function deleteCanvasNode(nodeId: string) {
   });
 
   revalidatePath("/canvases");
+}
+
+export async function clearNodeContent(nodeId: string) {
+  if (!nodeId) {
+    return { ok: false };
+  }
+
+  db.update(canvasNodes)
+    .set({
+      content: "",
+      result: null,
+      selectedQuestion: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(canvasNodes.id, nodeId))
+    .run();
+
+  return { ok: true };
+}
+
+export async function saveNodeToInspiration(nodeId: string) {
+  const node = db
+    .select()
+    .from(canvasNodes)
+    .where(eq(canvasNodes.id, nodeId))
+    .get();
+
+  if (!node) {
+    return { ok: false, error: "便签不存在" };
+  }
+
+  const content = node.content.trim();
+  if (!content) {
+    return { ok: false, error: "便签还没有正文" };
+  }
+
+  const title = node.title.trim() || "未命名灵感";
+  const existing = db
+    .select()
+    .from(inspirations)
+    .where(
+      and(
+        eq(inspirations.title, title),
+        eq(inspirations.content, content),
+        eq(inspirations.status, "active"),
+      ),
+    )
+    .get();
+
+  if (existing) {
+    return {
+      ok: true,
+      id: existing.id,
+      title: existing.title,
+      existed: true,
+    };
+  }
+
+  const id = crypto.randomUUID();
+  const keywords = extractKeywords({ title, content });
+
+  db.transaction((tx) => {
+    tx.insert(inspirations)
+      .values({
+        id,
+        title,
+        content,
+        origin: "manual",
+        status: "active",
+      })
+      .run();
+
+    for (const keyword of keywords) {
+      tx.insert(inspirationKeywords)
+        .values({
+          id: crypto.randomUUID(),
+          inspirationId: id,
+          keyword,
+        })
+        .run();
+    }
+  });
+
+  revalidatePath("/inspirations");
+
+  return { ok: true, id, title, existed: false };
+}
+
+export async function exportNodeToDocument(nodeId: string) {
+  const node = db
+    .select()
+    .from(canvasNodes)
+    .where(eq(canvasNodes.id, nodeId))
+    .get();
+
+  if (!node) {
+    return { ok: false, error: "便签不存在" };
+  }
+
+  const content = node.content.trim();
+  if (!content) {
+    return { ok: false, error: "便签还没有正文" };
+  }
+
+  const canvas = db
+    .select()
+    .from(canvases)
+    .where(eq(canvases.id, node.canvasId))
+    .get();
+  const edges = db
+    .select()
+    .from(connections)
+    .where(
+      or(
+        eq(connections.fromNodeId, nodeId),
+        eq(connections.toNodeId, nodeId),
+      ),
+    )
+    .all();
+  const otherIds = [
+    ...new Set(
+      edges.map((edge) =>
+        edge.fromNodeId === nodeId ? edge.toNodeId : edge.fromNodeId,
+      ),
+    ),
+  ];
+  const otherNodes =
+    otherIds.length > 0
+      ? db
+          .select({ id: canvasNodes.id, title: canvasNodes.title })
+          .from(canvasNodes)
+          .where(inArray(canvasNodes.id, otherIds))
+          .all()
+      : [];
+  const titleById = new Map(
+    otherNodes.map((other) => [other.id, other.title]),
+  );
+  const groups =
+    edges.length > 0
+      ? db
+          .select()
+          .from(dimensionGroups)
+          .where(
+            inArray(
+              dimensionGroups.connectionId,
+              edges.map((edge) => edge.id),
+            ),
+          )
+          .all()
+      : [];
+  const dimensions =
+    groups.length > 0
+      ? db
+          .select()
+          .from(dimensionNodes)
+          .where(
+            inArray(
+              dimensionNodes.groupId,
+              groups.map((group) => group.id),
+            ),
+          )
+          .all()
+      : [];
+  const dimensionsByGroup = new Map<
+    string,
+    (typeof dimensions)[number][]
+  >();
+  for (const dimension of dimensions) {
+    const list = dimensionsByGroup.get(dimension.groupId) ?? [];
+    list.push(dimension);
+    dimensionsByGroup.set(dimension.groupId, list);
+  }
+
+  const groupLabel = new Map<string, string>();
+  for (const group of groups) {
+    const groupDimensions = dimensionsByGroup.get(group.id) ?? [];
+    const selected = groupDimensions.find((dimension) => dimension.selected);
+    const labels: string[] = [];
+    let current = selected;
+    const byId = new Map(
+      groupDimensions.map((dimension) => [dimension.id, dimension]),
+    );
+
+    while (current) {
+      labels.unshift(current.label);
+      current = current.parentId
+        ? byId.get(current.parentId)
+        : undefined;
+    }
+
+    groupLabel.set(
+      group.id,
+      labels.length > 0
+        ? `${group.relationType}：${labels.join(" / ")}`
+        : group.relationType,
+    );
+  }
+
+  const groupsByEdge = new Map<string, string[]>();
+  for (const group of groups) {
+    const list = groupsByEdge.get(group.connectionId) ?? [];
+    list.push(groupLabel.get(group.id) ?? group.relationType);
+    groupsByEdge.set(group.connectionId, list);
+  }
+
+  const roles: Record<NoteRole, string> = {
+    inspiration: "灵感",
+    process: "过程",
+    result: "结果",
+    blank: "空白",
+  };
+  const relationLines = edges.map((edge) => {
+    const outgoing = edge.fromNodeId === nodeId;
+    const otherId = outgoing ? edge.toNodeId : edge.fromNodeId;
+    const labels = groupsByEdge.get(edge.id) ?? [];
+    const suffix =
+      labels.length > 0 ? `（${labels.join("、")}）` : "";
+    return `- ${outgoing ? "→" : "←"} ${titleById.get(otherId) ?? "未命名节点"}${suffix}`;
+  });
+
+  const documentTitle = node.title.trim() || "画布导出";
+  const lines = [
+    `# ${documentTitle}`,
+    "",
+    `> 角色：${roles[node.type as NoteRole]} · 权重：${node.weight}`,
+    "",
+    content,
+  ];
+
+  if (node.note.trim()) {
+    lines.push("", "## 备注", "", node.note.trim());
+  }
+
+  if (relationLines.length > 0) {
+    lines.push("", "## 关系", "", ...relationLines);
+  }
+
+  lines.push(
+    "",
+    `> 来源：${canvas?.name ?? "画布"} · 便签「${node.title}」`,
+  );
+
+  const id = crypto.randomUUID();
+  db.insert(documents)
+    .values({
+      id,
+      outputNodeId: node.id,
+      title: documentTitle,
+      content: lines.join("\n"),
+    })
+    .run();
+
+  revalidatePath("/documents");
+
+  return { ok: true, id, title: documentTitle };
 }

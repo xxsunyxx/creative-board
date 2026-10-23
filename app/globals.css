@@ -1485,7 +1485,9 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  row-gap: 5px;
   margin-top: auto;
+  flex-wrap: wrap;
 }
 
 .note-role-select {
@@ -1522,7 +1524,43 @@ button {
 .node-footer-actions {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.node-icon-button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #64748b;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.node-icon-button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.node-icon-button:hover:not(:disabled) {
+  border-color: rgba(37, 99, 235, 0.4);
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.node-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .canvas-node.role-blank .canvas-note-paper {
@@ -1631,18 +1669,31 @@ button {
 }
 
 .canvas-resize-handle {
-  width: 15px !important;
-  height: 15px !important;
-  border: 2px solid #ffffff !important;
-  border-radius: 4px !important;
-  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.22) !important;
+  width: 9px !important;
+  height: 9px !important;
+  border: 1.5px solid #ffffff !important;
+  border-radius: 3px !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18) !important;
+  transition:
+    width 120ms ease,
+    height 120ms ease,
+    border-radius 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .canvas-resize-handle::after {
   content: "";
   position: absolute;
-  inset: -5px;
+  inset: -6px;
   border-radius: 7px;
+}
+
+.canvas-resize-handle:hover {
+  width: 15px !important;
+  height: 15px !important;
+  border-width: 2px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 7px rgba(15, 23, 42, 0.22) !important;
 }
 
 .canvas-resize-line {
@@ -1745,16 +1796,18 @@ button {
 
 .canvas-handle {
   z-index: 30;
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px;
-  min-height: 16px;
-  border: 2.5px solid #ffffff;
+  width: 9px !important;
+  height: 9px !important;
+  min-width: 9px;
+  min-height: 9px;
+  border: 1.5px solid #ffffff;
   background: var(--node-color, #3b82f6);
-  box-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--node-color, #3b82f6) 16%, transparent);
-  opacity: 0.88;
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--node-color, #3b82f6) 14%, transparent);
+  opacity: 0.72;
   transition:
+    width 120ms ease,
+    height 120ms ease,
     opacity 150ms ease,
     box-shadow 150ms ease;
 }
@@ -1762,7 +1815,7 @@ button {
 .canvas-handle::after {
   content: "";
   position: absolute;
-  inset: -5px;
+  inset: -6px;
   border-radius: 50%;
 }
 
@@ -1771,8 +1824,14 @@ button {
 }
 
 .canvas-handle:hover {
-  box-shadow: 0 0 0 6px
-    color-mix(in srgb, var(--node-color, #3b82f6) 22%, transparent);
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  min-height: 16px;
+  border-width: 2.5px;
+  opacity: 1;
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--node-color, #3b82f6) 20%, transparent);
 }
 
 .canvas-handle-source {

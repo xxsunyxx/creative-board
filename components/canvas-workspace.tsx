@@ -53,8 +53,11 @@ import {
   selectDimension,
 } from "@/lib/actions/edges";
 import {
+  clearNodeContent,
   createNote,
+  exportNodeToDocument,
   insertProcessOnConnection,
+  saveNodeToInspiration,
   updateNoteContent,
   updateNoteRole,
 } from "@/lib/actions/canvas";
@@ -93,6 +96,9 @@ type CanvasActions = {
   saveNote: (id: string, note: string) => Promise<number>;
   deleteNode: (id: string) => void;
   insertProcess: (connectionId: string) => void;
+  clearContent: (id: string) => void;
+  saveToInspiration: (id: string) => void;
+  exportDocument: (id: string) => void;
   requestAddGroup: (connectionId: string) => void;
   selectedDimension: { connectionId: string; groupId: string } | null;
   selectDimensionChip: (connectionId: string, groupId: string) => void;
@@ -316,6 +322,76 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
             <option value="blank">空白</option>
           </select>
           <div className="node-footer-actions">
+            <button
+              type="button"
+              className="node-icon-button nodrag"
+              title="清空正文"
+              aria-label="清空正文"
+              disabled={!data.content.trim()}
+              onClick={() => {
+                if (window.confirm("清空这个便签的正文？")) {
+                  actions.clearContent(id);
+                }
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m7 21-4-4 10-10 4 4-10 10Z" />
+                <path d="M22 21H7" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="node-icon-button nodrag"
+              title="存入灵感库（手动）"
+              aria-label="存入灵感库"
+              disabled={!data.content.trim()}
+              onClick={() => actions.saveToInspiration(id)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 18h6" />
+                <path d="M10 22h4" />
+                <path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="node-icon-button nodrag"
+              title="导出为文档"
+              aria-label="导出为文档"
+              disabled={!data.content.trim()}
+              onClick={() => actions.exportDocument(id)}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                <path d="M14 2v6h6" />
+                <path d="M12 18v-6" />
+                <path d="m9 15 3 3 3-3" />
+              </svg>
+            </button>
             <button
               type="button"
               className="node-note-button nodrag"
@@ -1173,6 +1249,41 @@ export default function CanvasWorkspace({
               second,
             ];
           });
+        })();
+      },
+      clearContent: (id) => {
+        setNodes((current) =>
+          current.map((node) =>
+            node.id === id
+              ? { ...node, data: { ...node.data, content: "" } }
+              : node,
+          ),
+        );
+        void clearNodeContent(id);
+        setInferMessage("已清空便签正文");
+      },
+      saveToInspiration: (id) => {
+        void (async () => {
+          const result = await saveNodeToInspiration(id);
+          if (!result.ok) {
+            setInferMessage(result.error ?? "存入灵感库失败");
+            return;
+          }
+          setInferMessage(
+            result.existed
+              ? `灵感库已有「${result.title}」`
+              : `已存入灵感库 · ${result.title}`,
+          );
+        })();
+      },
+      exportDocument: (id) => {
+        void (async () => {
+          const result = await exportNodeToDocument(id);
+          if (!result.ok) {
+            setInferMessage(result.error ?? "导出文档失败");
+            return;
+          }
+          setInferMessage(`文档已生成 · ${result.title}`);
         })();
       },
       saveNote: async (id, note) => {
