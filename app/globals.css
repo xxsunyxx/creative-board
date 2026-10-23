@@ -1451,6 +1451,11 @@ button {
   white-space: nowrap;
 }
 
+.canvas-node-title.is-placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
 .canvas-weight {
   width: 34px;
   height: 25px;

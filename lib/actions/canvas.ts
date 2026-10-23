@@ -397,6 +397,7 @@ export async function clearNodeContent(nodeId: string) {
 
   db.update(canvasNodes)
     .set({
+      title: "",
       content: "",
       result: null,
       selectedQuestion: null,

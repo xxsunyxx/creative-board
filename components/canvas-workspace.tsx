@@ -220,7 +220,13 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
             title="更换颜色"
             aria-label="更换颜色"
           />
-          <span className="canvas-node-title">{data.title}</span>
+          <span
+            className={`canvas-node-title ${
+              data.title ? "" : "is-placeholder"
+            }`}
+          >
+            {data.title || "未命名便签"}
+          </span>
           <input
             className="canvas-weight nodrag"
             type="number"
@@ -241,7 +247,7 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
               type="button"
               className="node-action node-clear nodrag"
             onClick={() => {
-              if (window.confirm("清空这个便签的正文？")) {
+              if (window.confirm("清空这个便签的标题和正文？")) {
                 actions.clearContent(id);
               }
             }}
@@ -1265,12 +1271,12 @@ export default function CanvasWorkspace({
         setNodes((current) =>
           current.map((node) =>
             node.id === id
-              ? { ...node, data: { ...node.data, content: "" } }
+              ? { ...node, data: { ...node.data, title: "", content: "" } }
               : node,
           ),
         );
         void clearNodeContent(id);
-        setInferMessage("已清空便签正文");
+        setInferMessage("已清空便签标题和正文");
       },
       saveToInspiration: (id) => {
         void (async () => {

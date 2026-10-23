@@ -126,7 +126,7 @@ function readDb() {
     .prepare("select id, title, content from documents where title = ?")
     .all("导出测试");
   const node = read
-    .prepare("select content from canvas_nodes where id = ?")
+    .prepare("select title, content from canvas_nodes where id = ?")
     .get(aId);
   const inspirationCount = read
     .prepare("select count(*) as total from inspirations")
@@ -199,6 +199,9 @@ try {
   await note.getByRole("button", { name: "清空正文" }).click();
   await page.waitForTimeout(700);
   const afterClear = readDb();
+  const titleAfterClear = await page
+    .locator(`.react-flow__node[data-id="${aId}"] .canvas-node-title`)
+    .innerText();
 
   console.log(
     JSON.stringify(
@@ -217,7 +220,9 @@ try {
         beforeInference,
         afterInference,
         autoSavedToInspiration: afterInference !== beforeInference,
+        clearedTitle: afterClear.node?.title ?? null,
         clearedContent: afterClear.node?.content ?? null,
+        titleAfterClear,
         logs,
       },
       null,
