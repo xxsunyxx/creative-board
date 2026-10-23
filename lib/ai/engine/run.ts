@@ -33,6 +33,22 @@ const allowedProviders: InferenceProvider[] = [
   "deepseek",
 ];
 
+const genericTitles = new Set([
+  "",
+  "空便签",
+  "空灵感",
+  "空结果",
+  "过程",
+]);
+
+function resolveNodeTitle(current: string, generated?: string) {
+  const trimmed = current.trim();
+  if (trimmed && !genericTitles.has(trimmed)) {
+    return current;
+  }
+  return generated?.trim() || current;
+}
+
 function sanitizeMessage(error: unknown, apiKey?: string) {
   const raw = error instanceof Error ? error.message : "推理失败";
   const safe = apiKey ? raw.replaceAll(apiKey, "[redacted]") : raw;
@@ -321,7 +337,7 @@ export async function runInference(
           };
           const after: NodePatchFields = {
             role,
-            title: output.title?.trim() || node.title,
+            title: resolveNodeTitle(node.title, output.title),
             content,
             roleLocked: node.roleLocked,
           };
