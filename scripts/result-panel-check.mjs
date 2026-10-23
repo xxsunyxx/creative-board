@@ -15,10 +15,45 @@ if (!executablePath) {
 const db = new Database("./data/app.db");
 const canvasId = `result-panel-${Date.now()}`;
 const nodeId = `result-panel-node-${Date.now()}`;
+const aId = `result-panel-a-${Date.now()}`;
+const bId = `result-panel-b-${Date.now()}`;
+const edgeA = `result-panel-ea-${Date.now()}`;
+const edgeB = `result-panel-eb-${Date.now()}`;
+const groupId = `result-panel-g-${Date.now()}`;
+const dimId = `result-panel-d-${Date.now()}`;
 const now = Date.now();
 db.prepare(
   "insert into canvases (id,name,description,created_at,updated_at) values (?,?,?,?,?)",
 ).run(canvasId, "结果面板测试", "测试后删除", now, now);
+
+for (const [id, title, content, x] of [
+  [aId, "团队创新", "需要高频碰撞、心理安全和非正式交流。", 60],
+  [bId, "远程办公", "降低协调成本，但异步沟通增加。", 60],
+]) {
+  db.prepare(
+    `insert into canvas_nodes
+     (id, canvas_id, type, role_locked, title, content, weight, color, note, status, x, y, width, height, created_at, updated_at)
+     values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).run(
+    id,
+    canvasId,
+    "inspiration",
+    1,
+    title,
+    content,
+    7,
+    "#3b82f6",
+    "",
+    "draft",
+    x,
+    60 + (id === bId ? 0 : 260),
+    280,
+    200,
+    now,
+    now,
+  );
+}
+
 db.prepare(
   `insert into canvas_nodes
    (id, canvas_id, type, role_locked, title, content, weight, color, note, status, x, y, width, height, created_at, updated_at)
@@ -34,13 +69,28 @@ db.prepare(
   "#10b981",
   "",
   "draft",
-  180,
+  560,
   160,
   300,
   220,
   now,
   now,
 );
+
+for (const [id, source] of [
+  [edgeA, aId],
+  [edgeB, bId],
+]) {
+  db.prepare(
+    "insert into connections (id, canvas_id, from_node_id, to_node_id, created_at) values (?,?,?,?,?)",
+  ).run(id, canvasId, source, nodeId, now);
+}
+db.prepare(
+  "insert into dimension_groups (id, connection_id, relation_type, order_index, attributes, created_at) values (?,?,?,?,?,?)",
+).run(groupId, edgeA, "因果", 0, null, now);
+db.prepare(
+  "insert into dimension_nodes (id, group_id, parent_id, label, level, selected, order_index, created_at) values (?,?,?,?,?,?,?,?)",
+).run(dimId, groupId, null, "机制", "main", 1, 0, now);
 db.close();
 
 const browser = await chromium.launch({ executablePath, headless: true });
@@ -97,7 +147,7 @@ try {
   await page.locator(".result-panel").waitFor();
   await page
     .locator(".result-panel")
-    .getByRole("button", { name: "导出为文档" })
+    .getByRole("button", { name: "生成完整文档" })
     .click();
   await page.locator(".result-panel").waitFor({ state: "detached" });
   await page.waitForTimeout(700);

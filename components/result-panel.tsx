@@ -77,8 +77,9 @@ export function ResultPanel({
             type="button"
             className="mini-button"
             onClick={() => onExport(draft)}
+            disabled={!draft.trim()}
           >
-            导出为文档
+            生成完整文档
           </button>
           <button type="button" className="mini-button" onClick={onClose}>
             取消

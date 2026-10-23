@@ -33,6 +33,20 @@ type AdapterInput = {
   context: InferenceContext;
 };
 
+export type TextProviderInput = {
+  provider: InferenceProvider;
+  apiKey?: string;
+  model: string;
+  system: string;
+  user: string;
+  maxTokens?: number;
+};
+
+export type RawProviderOutput = {
+  text: string;
+  usage: TokenUsage;
+};
+
 const allowedRoles: NoteRole[] = ["inspiration", "process", "result"];
 
 function sanitize(text: string, apiKey: string) {
@@ -331,4 +345,174 @@ export async function callProvider(
     system: input.system,
     user: input.user,
   });
+}
+
+async function callOpenAiCompatibleText({
+  url,
+  apiKey,
+  model,
+  system,
+  user,
+  maxTokens,
+}: {
+  url: string;
+  apiKey: string;
+  model: string;
+  system: string;
+  user: string;
+  maxTokens: number;
+}): Promise<RawProviderOutput> {
+  const messages = [
+    { role: "system", content: system },
+    { role: "user", content: user },
+  ];
+  const request = (body: Record<string, unknown>) =>
+    postJson(
+      url,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      },
+      apiKey,
+    );
+
+  let data: Record<string, unknown>;
+
+  try {
+    data = await request({
+      model,
+      temperature: 0.4,
+      max_tokens: maxTokens,
+      response_format: { type: "json_object" },
+      messages,
+    });
+  } catch (error) {
+    if (error instanceof ProviderError && error.status === 400) {
+      const message = error.message.toLowerCase();
+      if (
+        /(temperature|max_tokens|response_format|unsupported|not supported|unrecognized|unknown parameter)/.test(
+          message,
+        )
+      ) {
+        data = await request({ model, messages });
+      } else {
+        throw error;
+      }
+    } else {
+      throw error;
+    }
+  }
+
+  const choices = Array.isArray(data.choices) ? data.choices : [];
+  const first = choices[0] as
+    | { message?: { content?: unknown } }
+    | undefined;
+  const text = first?.message?.content;
+
+  if (typeof text !== "string" || !text.trim()) {
+    throw new ProviderError("provider 没有返回内容");
+  }
+
+  return { text, usage: normalizeChatUsage(data.usage) };
+}
+
+async function callAnthropicText({
+  apiKey,
+  model,
+  system,
+  user,
+  maxTokens,
+}: {
+  apiKey: string;
+  model: string;
+  system: string;
+  user: string;
+  maxTokens: number;
+}): Promise<RawProviderOutput> {
+  const data = await postJson(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        temperature: 0.4,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+    },
+    apiKey,
+  );
+
+  const blocks = Array.isArray(data.content) ? data.content : [];
+  const text = blocks
+    .map((block) => {
+      const item = block as { type?: string; text?: string };
+      return item.type === "text" ? (item.text ?? "") : "";
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  if (!text.trim()) {
+    throw new ProviderError("provider 没有返回内容");
+  }
+
+  return { text, usage: normalizeAnthropicUsage(data.usage) };
+}
+
+export async function callProviderText(
+  input: TextProviderInput,
+): Promise<RawProviderOutput> {
+  if (!input.apiKey) {
+    throw new ProviderError("缺少 API key");
+  }
+
+  if (!input.model) {
+    throw new ProviderError("缺少模型");
+  }
+
+  const maxTokens = input.maxTokens ?? 4000;
+
+  if (input.provider === "openai") {
+    return callOpenAiCompatibleText({
+      url: "https://api.openai.com/v1/chat/completions",
+      apiKey: input.apiKey,
+      model: input.model,
+      system: input.system,
+      user: input.user,
+      maxTokens,
+    });
+  }
+
+  if (input.provider === "deepseek") {
+    return callOpenAiCompatibleText({
+      url: "https://api.deepseek.com/chat/completions",
+      apiKey: input.apiKey,
+      model: input.model,
+      system: input.system,
+      user: input.user,
+      maxTokens,
+    });
+  }
+
+  if (input.provider === "anthropic") {
+    return callAnthropicText({
+      apiKey: input.apiKey,
+      model: input.model,
+      system: input.system,
+      user: input.user,
+      maxTokens,
+    });
+  }
+
+  throw new ProviderError("mock provider 不调用外部模型");
 }

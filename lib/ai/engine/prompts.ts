@@ -3,6 +3,7 @@ import type {
   ContextNeighbor,
   InferenceContext,
 } from "./types";
+import type { DocumentContext } from "./document-types";
 
 const roleLabels: Record<NoteRole, string> = {
   inspiration: "灵感",
@@ -115,22 +116,14 @@ export function buildSystemPrompt(role: NoteRole) {
 - ${roleInstructions[role]}`;
 }
 
-export function buildUserPrompt(context: InferenceContext) {
+function buildContextBrief(context: InferenceContext) {
   const hint = context.hint.trim() || "（没有额外提示，以画布目标为准）";
   const description =
     context.canvas.description.trim() || "（画布没有填写描述）";
   const currentContent =
     context.node.content.trim() || "（空白，等待补全）";
-  const task =
-    context.node.role === "result"
-      ? "把入线当成论证材料，写成一段有中间机制的结论：在什么条件下，什么变量通过什么过程导致了什么结果？如果入线之间是条件、冲突或互相限制的关系，先说清它们如何相互作用，不要把它们并列成两个理由。如果缺少中间过程，先指出缺了什么，不要强行编一个结论。不要写放之四海而皆准的万能结论。"
-      : context.node.role === "process"
-        ? "把入线和出线看成一条链，写成一段机制解释：中间发生了什么，为什么它会把两端连起来？不要只复述两端。"
-        : "先判断它是已有对象还是未知对象：已有对象直接说它是什么；未知对象给它一个工作名，写清类别、可观察特质、流程和边界，并标注「暂命名 / 待验证」。不要写口号，也不要把它伪装成公认事实。";
 
-  return `下面是一张正在成形的画布。请只根据这些信息，为当前便签写内容。
-
-## 画布
+  return `## 画布
 名称：${context.canvas.name || "未命名画布"}
 目标：${description}
 本次提示：${hint}
@@ -146,12 +139,138 @@ node.id：${context.node.id}（只用于 JSON 回填，不要写进正文）
 ${formatNeighbors(context.incoming, "in")}
 
 ## 当前便签影响谁（出线）
-${formatNeighbors(context.outgoing, "out")}
+${formatNeighbors(context.outgoing, "out")}`;
+}
+
+export function buildUserPrompt(context: InferenceContext) {
+  const task =
+    context.node.role === "result"
+      ? "把入线当成论证材料，写成一段有中间机制的结论：在什么条件下，什么变量通过什么过程导致了什么结果？如果入线之间是条件、冲突或互相限制的关系，先说清它们如何相互作用，不要把它们并列成两个理由。如果缺少中间过程，先指出缺了什么，不要强行编一个结论。不要写放之四海而皆准的万能结论。"
+      : context.node.role === "process"
+        ? "把入线和出线看成一条链，写成一段机制解释：中间发生了什么，为什么它会把两端连起来？不要只复述两端。"
+        : "先判断它是已有对象还是未知对象：已有对象直接说它是什么；未知对象给它一个工作名，写清类别、可观察特质、流程和边界，并标注「暂命名 / 待验证」。不要写口号，也不要把它伪装成公认事实。";
+
+  return `下面是一张正在成形的画布。请只根据这些信息，为当前便签写内容。
+
+${buildContextBrief(context)}
 
 ## 写作任务
 ${task}
 
 把关系当成推理角度，不要复述关系名称或维度名称。正文要像人真的想过之后写出来的，而不是把上面的字段翻译一遍。只输出 JSON。`;
+}
+
+export function buildQuestionSystemPrompt() {
+  return `你是研究问题的编辑，负责从一个结果节点和它的入线材料里，找出真正值得回答的问题。
+
+只输出一个 JSON 对象，不要 Markdown 代码块，不要解释。格式：
+{
+  "questions": [
+    { "question": "问题本身", "angle": "这个问题在检验什么" }
+  ]
+}
+
+规则：
+- 生成 3-5 个问题，必须能用当前入线材料部分回答，或者明确指出缺哪块材料。
+- 至少要有一个条件 / 反例 / 边界问题，不要全是「如何提升……」。
+- 问题要具体到当前画布里的变量和冲突，不要换成任何一张画布都能用的万能问题。
+- 不要在问题里出现「维度」「入线」「出线」「关系类型」这些系统词，也不要原样复述维度短语。
+- 问题之间要有区分：一个问机制，一个问条件，一个问反例或代价。
+- 用自然中文，每个问题 15-60 字。`;
+}
+
+export function buildQuestionUserPrompt(context: InferenceContext) {
+  return `下面是一张正在成形的画布。请先读懂当前结果节点和它的入线，再提出候选问题。
+
+${buildContextBrief(context)}
+
+## 任务
+不要写结果正文。提出 3-5 个能推进这个结果的问题。问题要能指向一个具体的中间机制、条件、反例或缺口，而不是泛泛的「如何优化」。
+只输出 JSON。`;
+}
+
+export function buildDocumentSystemPrompt() {
+  return `你是研究文档作者。给定一个结果节点和它的上游论证材料，写一篇完整的 Markdown 文档。
+
+重要：
+- 现有结果是最终结论。不要改写它的核心判断，但要把“为什么能得到这个结论”展开。
+- 这不是简报，也不是把便签内容拼起来；要有论据、推理过程和边界。
+- 维度关系只是推理角度，不要出现「维度」「入线」「出线」「关系类型」这些系统词，也不要原样复述维度短语。
+- 不编造具体数据、引用、人物或案例；不确定就写「可能」「取决于」「在……条件下」。
+- 不要用营销文案语气；像一篇认真写过的研究稿。
+
+文档结构（用 Markdown）：
+1. 标题
+2. 结论：复述现有结果的核心判断，并说明它成立的语境。
+3. 论据：来自上游材料的支撑、反例或限制；每条说明它支撑哪一步。
+4. 推理过程：至少 2-3 个中间步骤，展示从论据到结论的推导，不要直接跳到结论。
+5. 条件、边界与反例：什么情况下成立，什么情况下会反转，代价是什么。
+6. 尚未解决的问题 / 下一步：指出缺口，不要假装已经解决。
+
+长度 1200-2500 字，可用小节和列表，但每节都要有实质内容。只输出一个 JSON 对象，不要 Markdown 代码块：
+{
+  "title": "文档标题",
+  "content": "# 标题\\n\\n正文 Markdown"
+}`;
+}
+
+export function buildDocumentUserPrompt(context: DocumentContext) {
+  const hint = context.hint.trim() || "（没有额外提示，以画布目标为准）";
+  const description =
+    context.canvas.description.trim() || "（画布没有填写描述）";
+  const materials =
+    context.materials.length > 0
+      ? context.materials
+          .map(
+            (material) => `- 「${material.title}」（${roleLabels[material.role]}，权重 ${material.weight}，距结果 ${material.depth} 跳）
+  内容：${material.content || "（空白）"}${
+    material.note ? `\n  备注：${material.note}` : ""
+  }`,
+          )
+          .join("\n")
+      : "（没有上游材料）";
+  const relations =
+    context.relations.length > 0
+      ? context.relations
+          .map((relation) => {
+            const guidance = relation.relationTypes
+              .map(
+                (type) =>
+                  relationGuidance[type] ?? "它们之间是什么关系？",
+              )
+              .filter(Boolean)
+              .join("；");
+            const focus =
+              relation.selectedPaths.length > 0
+                ? `可以从「${relation.selectedPaths.join("、")}」这个角度想，但不要把短语写进正文。`
+                : "";
+            return `- 「${relation.fromTitle}」→「${relation.toTitle}」：${relation.relationTypes.join(" / ") || "未选关系"}。${guidance} ${focus}`;
+          })
+          .join("\n")
+      : "（没有关系链）";
+
+  return `下面是一个结果节点和它的上游材料。请把这个结果展开成一篇完整文档。
+
+## 画布
+名称：${context.canvas.name || "未命名画布"}
+目标：${description}
+本次提示：${hint}
+
+## 最终结果
+标题：${context.result.title || "未命名结果"}
+选定问题：${context.result.selectedQuestion || "（还没有选定问题）"}
+现有结果：${context.result.content || "（结果是空白；请根据上游材料说明目前能说到哪一步）"}
+
+## 上游材料
+${materials}
+
+## 关系链
+${relations}
+
+## 任务
+写一篇 1200-2500 字的 Markdown 文档，把上面的材料组织成一条论证链：先说明结论，再给出论据，再展示推理过程，最后写条件、边界和尚未解决的问题。
+
+不要把材料逐条复述成列表；要说明每条材料在论证里起什么作用。关系名称和角度短语只用于推理，不要原样写进正文。只输出 JSON。`;
 }
 
 export const noteOutputSchema = {

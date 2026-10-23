@@ -477,7 +477,12 @@ export async function saveNodeToInspiration(nodeId: string) {
   return { ok: true, id, title, existed: false };
 }
 
-export async function exportNodeToDocument(nodeId: string) {
+export async function exportNodeToDocument(
+  nodeId: string,
+): Promise<
+  | { ok: true; id: string; title: string }
+  | { ok: false; error: string }
+> {
   const node = db
     .select()
     .from(canvasNodes)

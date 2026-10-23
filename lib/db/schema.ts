@@ -242,7 +242,12 @@ export const inferenceRuns = sqliteTable(
       .notNull()
       .references(() => canvases.id, { onDelete: "cascade" }),
     taskType: text("task_type", {
-      enum: ["fill_blank_notes", "generate_questions", "generate_result"],
+      enum: [
+        "fill_blank_notes",
+        "generate_questions",
+        "generate_result",
+        "generate_document",
+      ],
     })
       .notNull()
       .default("fill_blank_notes"),

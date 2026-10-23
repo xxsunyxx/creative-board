@@ -100,7 +100,7 @@ type CanvasActions = {
   openResult: (id: string) => void;
   clearContent: (id: string) => void;
   saveToInspiration: (id: string) => void;
-  exportDocument: (id: string) => void;
+  exportDocument: (id: string, role: NoteRole) => void;
   requestAddGroup: (connectionId: string) => void;
   selectedDimension: { connectionId: string; groupId: string } | null;
   selectDimensionChip: (connectionId: string, groupId: string) => void;
@@ -389,7 +389,7 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
                   title="导出为文档"
                   aria-label="导出为文档"
                   disabled={!data.content.trim()}
-                  onClick={() => actions.exportDocument(id)}
+                  onClick={() => actions.exportDocument(id, data.role)}
                 >
                   <svg
                     viewBox="0 0 24 24"
@@ -1143,6 +1143,10 @@ export default function CanvasWorkspace({
   const [inferMessage, setInferMessage] = useState("");
   const [inferHint, setInferHint] = useState("");
   const [resultPanelId, setResultPanelId] = useState<string | null>(null);
+  const [lastDocument, setLastDocument] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const [selectedDimension, setSelectedDimension] = useState<{
     connectionId: string;
     groupId: string;
@@ -1305,13 +1309,73 @@ export default function CanvasWorkspace({
           );
         })();
       },
-      exportDocument: (id) => {
+      exportDocument: (id, role) => {
         void (async () => {
+          if (role === "result") {
+            const config = readAiConfig();
+
+            if (config && (!config.apiKey.trim() || !config.model.trim())) {
+              setInferMessage("请先在 AI 设置里测试连接并选择模型");
+              return;
+            }
+
+            const provider = config?.provider ?? "mock";
+            const apiKey = config?.apiKey ?? "";
+            const model = config?.model ?? "";
+
+            setInferMessage("正在生成完整文档…");
+
+            try {
+              const response = await fetch("/api/ai/document", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  nodeId: id,
+                  provider,
+                  model,
+                  apiKey,
+                  hint: inferHint.trim(),
+                }),
+              });
+              const result = (await response.json()) as
+                | {
+                    ok: true;
+                    documentId: string;
+                    title: string;
+                    usage: TokenUsage;
+                    canvasTokens: number;
+                  }
+                | { ok: false; error: string };
+
+              if (!response.ok || !result.ok) {
+                setInferMessage(
+                  result.ok ? "生成文档失败" : (result.error ?? "生成文档失败"),
+                );
+                return;
+              }
+
+              setLastDocument({
+                id: result.documentId,
+                title: result.title,
+              });
+              setCanvasTokens(result.canvasTokens);
+              setInferMessage(
+                `文档已生成 · ${result.title} · ${result.usage.totalTokens} tokens`,
+              );
+            } catch (error) {
+              setInferMessage(
+                error instanceof Error ? error.message : "生成文档失败",
+              );
+            }
+            return;
+          }
+
           const result = await exportNodeToDocument(id);
           if (!result.ok) {
             setInferMessage(result.error ?? "导出文档失败");
             return;
           }
+          setLastDocument({ id: result.id, title: result.title });
           setInferMessage(`文档已生成 · ${result.title}`);
         })();
       },
@@ -1933,6 +1997,14 @@ export default function CanvasWorkspace({
           {inferMessage ? (
             <span className="canvas-infer-status">{inferMessage}</span>
           ) : null}
+          {lastDocument ? (
+            <Link
+              href={`/documents/${lastDocument.id}`}
+              className="canvas-doc-link"
+            >
+              打开文档
+            </Link>
+          ) : null}
         </div>
 
         <ReactFlow
@@ -2012,7 +2084,7 @@ export default function CanvasWorkspace({
             onExport={(content) => {
               void (async () => {
                 await actions.updateContent(resultNode.id, content);
-                actions.exportDocument(resultNode.id);
+                actions.exportDocument(resultNode.id, "result");
                 setResultPanelId(null);
               })();
             }}
