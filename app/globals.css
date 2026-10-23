@@ -1521,6 +1521,13 @@ button {
   color: #64748b;
 }
 
+.node-footer-left {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
 .node-footer-actions {
   display: flex;
   align-items: center;

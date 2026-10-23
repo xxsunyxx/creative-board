@@ -335,22 +335,22 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
         )}
 
         <div className="canvas-node-footer">
-          <select
-            className={`note-role-select role-${data.role} nodrag`}
-            value={data.role}
-            title="便签角色"
-            onChange={(event) =>
-              actions.updateRole(id, event.target.value as NoteRole)
-            }
-          >
-            <option value="inspiration">灵感</option>
-            <option value="process">过程</option>
-            <option value="result">结果</option>
-            {!data.sourceInspirationId ? (
-              <option value="blank">空白</option>
-            ) : null}
-          </select>
-          <div className="node-footer-actions">
+          <div className="node-footer-left">
+            <select
+              className={`note-role-select role-${data.role} nodrag`}
+              value={data.role}
+              title="便签角色"
+              onChange={(event) =>
+                actions.updateRole(id, event.target.value as NoteRole)
+              }
+            >
+              <option value="inspiration">灵感</option>
+              <option value="process">过程</option>
+              <option value="result">结果</option>
+              {!data.sourceInspirationId ? (
+                <option value="blank">空白</option>
+              ) : null}
+            </select>
             {!data.sourceInspirationId ? (
               <>
                 <button
@@ -400,6 +400,8 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
                 </button>
               </>
             ) : null}
+          </div>
+          <div className="node-footer-actions">
             <button
               type="button"
               className="node-note-button nodrag"
