@@ -257,8 +257,8 @@ export async function sendToCanvas(formData: FormData) {
       content: inspiration.content,
       weight: 5,
       color: nodeColors[nodeCount % nodeColors.length],
-      x: 80 + (nodeCount % 3) * 300,
-      y: 80 + Math.floor(nodeCount / 3) * 220,
+      x: 80 + (nodeCount % 3) * 460,
+      y: 80 + Math.floor(nodeCount / 3) * 300,
       width: 240,
       height: 160,
     })

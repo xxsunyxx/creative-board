@@ -3,23 +3,59 @@
 import {
   Background,
   BackgroundVariant,
+  ConnectionMode,
   Controls,
+  EdgeLabelRenderer,
+  Handle,
   MiniMap,
+  Position,
   ReactFlow,
+  useEdgesState,
   useNodesState,
+  type Connection as FlowConnection,
+  type EdgeProps,
+  type EdgeTypes,
+  type NodeChange,
   type NodeProps,
   type NodeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import Link from "next/link";
-import { createContext, useContext, useMemo, useState } from "react";
+import {
+  Fragment,
+  createContext,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import dagre from "@dagrejs/dagre";
+import { RelationshipPicker } from "@/components/relationship-picker";
 import {
   deleteCanvasNode,
   saveNodeNote,
   updateNodeColor,
   updateNodePosition,
+  updateNodePositions,
   updateNodeWeight,
 } from "@/lib/actions/canvas";
-import type { CanvasNodeData, CanvasNodeType } from "@/lib/canvas-types";
+import {
+  addDimensionNode,
+  createConnection as createConnectionAction,
+  createDimensionGroup,
+  deleteConnection as deleteConnectionAction,
+  deleteDimensionGroup,
+  selectDimension,
+} from "@/lib/actions/edges";
+import type {
+  CanvasNodeData,
+  CanvasNodeType,
+  DimensionEdgeData,
+  DimensionEdgeType,
+  DimensionGroupData,
+  DimensionNodeData,
+} from "@/lib/canvas-types";
 import "@xyflow/react/dist/style.css";
 
 const palette = [
@@ -36,6 +72,20 @@ type CanvasActions = {
   updateColor: (id: string, color: string) => void;
   saveNote: (id: string, note: string) => Promise<number>;
   deleteNode: (id: string) => void;
+  requestAddGroup: (connectionId: string) => void;
+  selectDimension: (
+    connectionId: string,
+    groupId: string,
+    dimensionId: string,
+  ) => void;
+  addDimension: (
+    connectionId: string,
+    groupId: string,
+    parentId: string | null,
+    label: string,
+  ) => void;
+  deleteGroup: (connectionId: string, groupId: string) => void;
+  deleteConnection: (connectionId: string) => void;
 };
 
 const CanvasActionsContext = createContext<CanvasActions | null>(null);
@@ -74,8 +124,37 @@ function InspirationNode({ id, data }: NodeProps<CanvasNodeType>) {
       style={{
         borderColor: data.color,
         borderWidth: 2 + Math.round((data.weight - 1) / 2),
-      }}
+        "--node-color": data.color,
+      } as CSSProperties}
     >
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="top"
+        className="canvas-handle"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className="canvas-handle canvas-handle-source"
+        title="拖到另一个便签上建立连接"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="bottom"
+        className="canvas-handle"
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="left"
+        className="canvas-handle"
+      />
+
+      <div className="canvas-node-accent" style={{ background: data.color }} />
+
       <div className="canvas-node-top">
         <button
           type="button"
@@ -184,14 +263,448 @@ function InspirationNode({ id, data }: NodeProps<CanvasNodeType>) {
   );
 }
 
+type Point = { x: number; y: number };
+
+function cubicPoint(
+  p0: Point,
+  c1: Point,
+  c2: Point,
+  p3: Point,
+  t: number,
+): Point {
+  const mt = 1 - t;
+  const a = mt * mt * mt;
+  const b = 3 * mt * mt * t;
+  const c = 3 * mt * t * t;
+  const d = t * t * t;
+  return {
+    x: a * p0.x + b * c1.x + c * c2.x + d * p3.x,
+    y: a * p0.y + b * c1.y + c * c2.y + d * p3.y,
+  };
+}
+
+function cubicTangent(
+  p0: Point,
+  c1: Point,
+  c2: Point,
+  p3: Point,
+  t: number,
+): Point {
+  const mt = 1 - t;
+  const a = 3 * mt * mt;
+  const b = 6 * mt * t;
+  const c = 3 * t * t;
+  return {
+    x: a * (c1.x - p0.x) + b * (c2.x - c1.x) + c * (p3.x - c2.x),
+    y: a * (c1.y - p0.y) + b * (c2.y - c1.y) + c * (p3.y - c2.y),
+  };
+}
+
+function childrenOf(group: DimensionGroupData, parentId: string | null) {
+  return group.nodes
+    .filter((node) => node.parentId === parentId)
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+}
+
+function selectedPath(group: DimensionGroupData) {
+  const selected = group.nodes.find((node) => node.selected);
+
+  if (!selected) {
+    return "待选择";
+  }
+
+  const labels = [selected.label];
+  let parentId = selected.parentId;
+
+  while (parentId) {
+    const parent = group.nodes.find((node) => node.id === parentId);
+    if (!parent) {
+      break;
+    }
+    labels.unshift(parent.label);
+    parentId = parent.parentId;
+  }
+
+  return labels.join(" / ");
+}
+
+function DimensionBranch({
+  node,
+  group,
+  depth,
+  expanded,
+  onToggle,
+  onSelect,
+  onAdd,
+}: {
+  node: DimensionNodeData;
+  group: DimensionGroupData;
+  depth: number;
+  expanded: Set<string>;
+  onToggle: (id: string) => void;
+  onSelect: (id: string) => void;
+  onAdd: (parentId: string, label: string) => void;
+}) {
+  const children = childrenOf(group, node.id);
+  const isExpanded = expanded.has(node.id);
+  const isSelected = group.nodes.find((item) => item.selected)?.id === node.id;
+
+  return (
+    <div className={`dim-branch dim-depth-${depth}`}>
+      <div className="dim-row">
+        <button
+          type="button"
+          className={`dim-label ${isSelected ? "is-selected" : ""}`}
+          onClick={() => {
+            if (children.length > 0) {
+              onToggle(node.id);
+            } else {
+              onSelect(node.id);
+            }
+          }}
+        >
+          {node.label}
+        </button>
+        <button
+          type="button"
+          className="dim-select"
+          onClick={() => onSelect(node.id)}
+          title="选这个维度"
+        >
+          选
+        </button>
+        <button
+          type="button"
+          className="dim-add"
+          onClick={() => {
+            const label = window.prompt("新增子维度");
+            if (label?.trim()) {
+              onAdd(node.id, label.trim());
+            }
+          }}
+          title="新增子维度"
+        >
+          ＋
+        </button>
+        {children.length > 0 ? (
+          <button
+            type="button"
+            className="dim-toggle"
+            onClick={() => onToggle(node.id)}
+          >
+            {isExpanded ? "−" : "+"}
+          </button>
+        ) : null}
+      </div>
+
+      {isExpanded && children.length > 0 ? (
+        <div className="dim-children">
+          {children.map((child) => (
+            <DimensionBranch
+              key={child.id}
+              node={child}
+              group={group}
+              depth={depth + 1}
+              expanded={expanded}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              onAdd={onAdd}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DimensionGroupPanel({
+  connectionId,
+  group,
+  actions,
+  onClose,
+}: {
+  connectionId: string;
+  group: DimensionGroupData;
+  actions: CanvasActions;
+  onClose: () => void;
+}) {
+  const roots = childrenOf(group, null);
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(roots.map((node) => node.id)),
+  );
+
+  const toggle = (id: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const add = (parentId: string | null, label: string) => {
+    actions.addDimension(connectionId, group.id, parentId, label);
+    if (parentId) {
+      setExpanded((current) => new Set(current).add(parentId));
+    }
+  };
+
+  return (
+    <div className="dimension-popover-inner">
+      <div className="popover-head">
+        <span className="popover-type">{group.relationType}</span>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={onClose}
+          aria-label="关闭"
+        >
+          ×
+        </button>
+      </div>
+      <div className="popover-sub">
+        选一个维度；＋ 可继续加子级，支持多层
+      </div>
+
+      <div className="dim-tree">
+        {roots.map((node) => (
+          <DimensionBranch
+            key={node.id}
+            node={node}
+            group={group}
+            depth={0}
+            expanded={expanded}
+            onToggle={toggle}
+            onSelect={(dimensionId) =>
+              actions.selectDimension(connectionId, group.id, dimensionId)
+            }
+            onAdd={(parentId, label) => add(parentId, label)}
+          />
+        ))}
+      </div>
+
+      <div className="dim-popover-actions">
+        <button
+          type="button"
+          className="mini-button"
+          onClick={() => {
+            const label = window.prompt("新增主维度");
+            if (label?.trim()) {
+              add(null, label.trim());
+            }
+          }}
+        >
+          ＋ 主维度
+        </button>
+        <button
+          type="button"
+          className="mini-button danger"
+          onClick={() => {
+            if (window.confirm(`删除「${group.relationType}」维度框？`)) {
+              actions.deleteGroup(connectionId, group.id);
+              onClose();
+            }
+          }}
+        >
+          删除维度框
+        </button>
+      </div>
+
+      <button
+        type="button"
+        className="dim-delete-connection"
+        onClick={() => {
+          if (window.confirm("删除整条连接？")) {
+            actions.deleteConnection(connectionId);
+          }
+        }}
+      >
+        删除整条连接
+      </button>
+    </div>
+  );
+}
+
+function DimensionEdge({
+  id,
+  data,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  selected,
+}: EdgeProps<DimensionEdgeType>) {
+  const actions = useContext(CanvasActionsContext);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const groups = data?.groups ?? [];
+  const p0 = { x: sourceX, y: sourceY };
+  const p3 = { x: targetX, y: targetY };
+  const dx = Math.max(70, Math.abs(targetX - sourceX) * 0.55);
+  const c1 = { x: sourceX + dx, y: sourceY };
+  const c2 = { x: targetX - dx, y: targetY };
+  const path = `M ${p0.x},${p0.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${p3.x},${p3.y}`;
+
+  const chipPositions = groups.map((_, index) => {
+    const count = groups.length;
+    const t = count === 1 ? 0.5 : 0.32 + (index / (count - 1)) * 0.36;
+    const point = cubicPoint(p0, c1, c2, p3, t);
+    const tangent = cubicTangent(p0, c1, c2, p3, t);
+    const length = Math.hypot(tangent.x, tangent.y) || 1;
+    const normal = { x: -tangent.y / length, y: tangent.x / length };
+    const offset = (index % 2 === 0 ? 1 : -1) * 34;
+    return {
+      x: point.x + normal.x * offset,
+      y: point.y + normal.y * offset,
+    };
+  });
+
+  const midPoint = cubicPoint(p0, c1, c2, p3, 0.5);
+  const sourceColor = data?.sourceColor ?? "#60a5fa";
+  const targetColor = data?.targetColor ?? "#a78bfa";
+  const gradientId = `edge-gradient-${id}`;
+  const markerId = `edge-arrow-${id}`;
+
+  if (!actions) {
+    return null;
+  }
+
+  return (
+    <>
+      <defs>
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={sourceColor} />
+          <stop offset="100%" stopColor={targetColor} />
+        </linearGradient>
+        <marker
+          id={markerId}
+          viewBox="0 0 10 10"
+          refX="8"
+          refY="5"
+          markerWidth="5"
+          markerHeight="5"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill={targetColor} />
+        </marker>
+      </defs>
+      <path className="dimension-edge-base" d={path} />
+      <path className="dimension-edge-glow" d={path} stroke={sourceColor} />
+      <path
+        className={`dimension-edge-path ${selected ? "is-selected" : ""}`}
+        d={path}
+        style={{ stroke: `url(#${gradientId})` }}
+        markerEnd={`url(#${markerId})`}
+      />
+      <EdgeLabelRenderer>
+        {groups.map((group, index) => {
+          const position = chipPositions[index];
+          const isOpen = openGroupId === group.id;
+
+          return (
+            <Fragment key={group.id}>
+              <button
+                type="button"
+                className={`dimension-chip nodrag nopan ${
+                  isOpen ? "is-open" : ""
+                }`}
+                style={{
+                  position: "absolute",
+                  transform: `translate(-50%, -50%) translate(${position.x}px, ${position.y}px)`,
+                  pointerEvents: "all",
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setOpenGroupId(isOpen ? null : group.id);
+                }}
+              >
+                <span className="chip-type">{group.relationType}</span>
+                <span className="chip-value">{selectedPath(group)}</span>
+              </button>
+
+              {isOpen && (
+                <div
+                  className="dimension-popover nodrag nopan nowheel"
+                  style={{
+                    position: "absolute",
+                    transform: `translate(-50%, 0) translate(${position.x}px, ${position.y + 30}px)`,
+                    pointerEvents: "all",
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <DimensionGroupPanel
+                    connectionId={id}
+                    group={group}
+                    actions={actions}
+                    onClose={() => setOpenGroupId(null)}
+                  />
+                </div>
+              )}
+            </Fragment>
+          );
+        })}
+
+        <button
+          type="button"
+          className="edge-add nodrag nopan"
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${midPoint.x}px, ${midPoint.y + 78}px)`,
+            pointerEvents: "all",
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            actions.requestAddGroup(id);
+          }}
+          title="在同一条线上增加一个维度框"
+        >
+          ＋ 维度框
+        </button>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
 const nodeTypes = { inspiration: InspirationNode } as NodeTypes;
+const edgeTypes = { dimension: DimensionEdge } as EdgeTypes;
 
 export default function CanvasWorkspace({
+  canvasId,
   initialNodes,
+  initialEdges,
 }: {
+  canvasId: string;
   initialNodes: CanvasNodeType[];
+  initialEdges: DimensionEdgeType[];
 }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [picker, setPicker] = useState<{
+    connectionId: string;
+    mode: "new" | "add";
+  } | null>(null);
+  const flowRef =
+    useRef<ReactFlowInstance<CanvasNodeType, DimensionEdgeType> | null>(null);
+
+  const handleNodesChange = (changes: NodeChange<CanvasNodeType>[]) => {
+    onNodesChange(changes);
+
+    for (const change of changes) {
+      if (
+        change.type === "position" &&
+        change.dragging === false &&
+        change.position
+      ) {
+        void updateNodePosition(
+          change.id,
+          change.position.x,
+          change.position.y,
+        );
+      }
+    }
+  };
 
   const actions = useMemo<CanvasActions>(
     () => ({
@@ -236,34 +749,288 @@ export default function CanvasWorkspace({
       },
       deleteNode: (id) => {
         setNodes((current) => current.filter((node) => node.id !== id));
+        setEdges((current) =>
+          current.filter(
+            (edge) => edge.source !== id && edge.target !== id,
+          ),
+        );
         void deleteCanvasNode(id);
       },
+      requestAddGroup: (connectionId) => {
+        setPicker({ connectionId, mode: "add" });
+      },
+      selectDimension: (connectionId, groupId, dimensionId) => {
+        setEdges((current) =>
+          current.map((edge) => {
+            if (edge.id !== connectionId) {
+              return edge;
+            }
+            const edgeData = edge.data as DimensionEdgeData | undefined;
+            return {
+              ...edge,
+              data: {
+                groups: (edgeData?.groups ?? []).map((group) =>
+                  group.id === groupId
+                    ? {
+                        ...group,
+                        nodes: group.nodes.map((node) => ({
+                          ...node,
+                          selected: node.id === dimensionId,
+                        })),
+                      }
+                    : group,
+                ),
+              },
+            };
+          }),
+        );
+        void selectDimension(connectionId, groupId, dimensionId);
+      },
+      addDimension: (connectionId, groupId, parentId, label) => {
+        void (async () => {
+          const result = await addDimensionNode(groupId, parentId, label);
+          if (!result) {
+            return;
+          }
+          setEdges((current) =>
+            current.map((edge) => {
+              if (edge.id !== connectionId) {
+                return edge;
+              }
+              const edgeData = edge.data as DimensionEdgeData | undefined;
+              return {
+                ...edge,
+                data: {
+                  groups: (edgeData?.groups ?? []).map((group) =>
+                    group.id === groupId
+                      ? {
+                          ...group,
+                          nodes: [...group.nodes, result.node],
+                        }
+                      : group,
+                  ),
+                },
+              };
+            }),
+          );
+        })();
+      },
+      deleteGroup: (connectionId, groupId) => {
+        setEdges((current) =>
+          current.map((edge) => {
+            if (edge.id !== connectionId) {
+              return edge;
+            }
+            const edgeData = edge.data as DimensionEdgeData | undefined;
+            return {
+              ...edge,
+              data: {
+                groups: (edgeData?.groups ?? []).filter(
+                  (group) => group.id !== groupId,
+                ),
+              },
+            };
+          }),
+        );
+        void deleteDimensionGroup(connectionId, groupId);
+      },
+      deleteConnection: (connectionId) => {
+        setEdges((current) =>
+          current.filter((edge) => edge.id !== connectionId),
+        );
+        void deleteConnectionAction(connectionId);
+      },
     }),
-    [setNodes],
+    [setEdges, setNodes],
   );
+
+  const handleConnect = (connection: FlowConnection) => {
+    if (
+      !connection.source ||
+      !connection.target ||
+      connection.source === connection.target
+    ) {
+      return;
+    }
+
+    void (async () => {
+      const result = await createConnectionAction(
+        canvasId,
+        connection.source!,
+        connection.target!,
+      );
+      if (!result) {
+        return;
+      }
+
+      const edge: DimensionEdgeType = {
+        id: result.connectionId,
+        source: connection.source!,
+        target: connection.target!,
+        type: "dimension",
+        data: { groups: [] },
+      };
+
+      setEdges((current) => [...current, edge]);
+      setPicker({ connectionId: result.connectionId, mode: "new" });
+    })();
+  };
+
+  const handlePickRelation = async (relationType: string) => {
+    if (!picker) {
+      return;
+    }
+
+    const result = await createDimensionGroup(
+      picker.connectionId,
+      relationType,
+    );
+
+    if (result) {
+      setEdges((current) =>
+        current.map((edge) => {
+          if (edge.id !== picker.connectionId) {
+            return edge;
+          }
+          const edgeData = edge.data as DimensionEdgeData | undefined;
+          return {
+            ...edge,
+            data: {
+              groups: [...(edgeData?.groups ?? []), result.group],
+            },
+          };
+        }),
+      );
+    }
+
+    setPicker(null);
+  };
+
+  const handleCancelPicker = () => {
+    if (!picker) {
+      return;
+    }
+
+    if (picker.mode === "new") {
+      setEdges((current) =>
+        current.filter((edge) => edge.id !== picker.connectionId),
+      );
+      void deleteConnectionAction(picker.connectionId);
+    }
+
+    setPicker(null);
+  };
+
+  const handleAutoLayout = () => {
+    if (nodes.length === 0) {
+      return;
+    }
+
+    const width = 280;
+    const height = 180;
+    let next: CanvasNodeType[];
+
+    if (edges.length === 0) {
+      const columns = Math.ceil(Math.sqrt(nodes.length));
+      next = nodes.map((node, index) => ({
+        ...node,
+        position: {
+          x: 80 + (index % columns) * 340,
+          y: 80 + Math.floor(index / columns) * 240,
+        },
+      }));
+    } else {
+      const graph = new dagre.graphlib.Graph();
+      graph.setDefaultEdgeLabel(() => ({}));
+      graph.setGraph({
+        rankdir: "LR",
+        nodesep: 120,
+        ranksep: 220,
+        marginx: 40,
+        marginy: 40,
+      });
+
+      for (const node of nodes) {
+        graph.setNode(node.id, { width, height });
+      }
+      for (const edge of edges) {
+        graph.setEdge(edge.source, edge.target);
+      }
+
+      dagre.layout(graph);
+
+      next = nodes.map((node) => {
+        const position = graph.node(node.id);
+        return {
+          ...node,
+          position: {
+            x: position.x - width / 2,
+            y: position.y - height / 2,
+          },
+        };
+      });
+    }
+
+    setNodes(next);
+    void updateNodePositions(
+      next.map((node) => ({
+        id: node.id,
+        x: node.position.x,
+        y: node.position.y,
+      })),
+    );
+    window.setTimeout(() => {
+      flowRef.current?.fitView({ padding: 0.2, maxZoom: 1.2 });
+    }, 80);
+  };
+
+  const pickerEdge = picker
+    ? edges.find((edge) => edge.id === picker.connectionId)
+    : null;
+  const pickerSource = pickerEdge
+    ? nodes.find((node) => node.id === pickerEdge.source)
+    : null;
+  const pickerTarget = pickerEdge
+    ? nodes.find((node) => node.id === pickerEdge.target)
+    : null;
+  const pickerContext = `${pickerSource?.data.title ?? ""} ${
+    pickerTarget?.data.title ?? ""
+  }`;
 
   return (
     <CanvasActionsContext.Provider value={actions}>
       <div className="canvas-stage">
         <div className="canvas-hint">
-          拖动便签调整位置 · 权重 / 颜色 / 备注 / 删除都在便签上
+          拖动便签调整位置 · 四边圆点拉线 · {nodes.length} 便签 ·{" "}
+          {edges.length} 连接
         </div>
+        <button
+          type="button"
+          className="canvas-auto-layout"
+          onClick={handleAutoLayout}
+        >
+          自动排布
+        </button>
 
         <ReactFlow
           nodes={nodes}
-          onNodesChange={onNodesChange}
-          nodeTypes={nodeTypes}
-          onNodeDragStop={(_, node) => {
-            void updateNodePosition(
-              node.id,
-              node.position.x,
-              node.position.y,
-            );
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={handleConnect}
+          onInit={(instance) => {
+            flowRef.current = instance;
           }}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          connectionMode={ConnectionMode.Loose}
+          snapToGrid
+          snapGrid={[20, 20]}
           fitView
           fitViewOptions={{ padding: 0.25, maxZoom: 1.2 }}
           minZoom={0.35}
           maxZoom={1.8}
+          connectionLineStyle={{ stroke: "#94a3b8", strokeWidth: 2 }}
         >
           <Background
             variant={BackgroundVariant.Dots}
@@ -290,6 +1057,16 @@ export default function CanvasWorkspace({
             </Link>
           </div>
         )}
+
+        <RelationshipPicker
+          open={Boolean(picker)}
+          mode={picker?.mode ?? "new"}
+          context={pickerContext}
+          onSelect={(label) => {
+            void handlePickRelation(label);
+          }}
+          onCancel={handleCancelPicker}
+        />
       </div>
     </CanvasActionsContext.Provider>
   );

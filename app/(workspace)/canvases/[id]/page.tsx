@@ -1,4 +1,11 @@
-import { and, count, eq, isNotNull, isNull } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+} from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import CanvasWorkspace from "@/components/canvas-workspace";
@@ -6,9 +13,17 @@ import { db } from "@/lib/db";
 import {
   canvasNodes,
   canvases,
+  connections,
+  dimensionGroups,
+  dimensionNodes,
   inspirationNotes,
 } from "@/lib/db/schema";
-import type { CanvasNodeType } from "@/lib/canvas-types";
+import type {
+  CanvasNodeType,
+  DimensionEdgeType,
+  DimensionGroupData,
+  DimensionNodeData,
+} from "@/lib/canvas-types";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +85,83 @@ export default async function CanvasPage({
       },
     }));
 
+  const activeNodeIds = new Set(initialNodes.map((node) => node.id));
+  const canvasConnections = db
+    .select()
+    .from(connections)
+    .where(eq(connections.canvasId, id))
+    .all()
+    .filter(
+      (connection) =>
+        activeNodeIds.has(connection.fromNodeId) &&
+        activeNodeIds.has(connection.toNodeId),
+    );
+
+  const connectionIds = canvasConnections.map((connection) => connection.id);
+  const groups =
+    connectionIds.length > 0
+      ? db
+          .select()
+          .from(dimensionGroups)
+          .where(inArray(dimensionGroups.connectionId, connectionIds))
+          .orderBy(dimensionGroups.orderIndex)
+          .all()
+      : [];
+  const groupIds = groups.map((group) => group.id);
+  const dimensionRows =
+    groupIds.length > 0
+      ? db
+          .select()
+          .from(dimensionNodes)
+          .where(inArray(dimensionNodes.groupId, groupIds))
+          .orderBy(dimensionNodes.orderIndex)
+          .all()
+      : [];
+
+  const dimensionsByGroup = new Map<string, DimensionNodeData[]>();
+  for (const row of dimensionRows) {
+    const list = dimensionsByGroup.get(row.groupId) ?? [];
+    list.push({
+      id: row.id,
+      parentId: row.parentId,
+      label: row.label,
+      level: row.level,
+      selected: row.selected,
+      orderIndex: row.orderIndex,
+    });
+    dimensionsByGroup.set(row.groupId, list);
+  }
+
+  const groupsByConnection = new Map<string, DimensionGroupData[]>();
+  for (const group of groups) {
+    const list = groupsByConnection.get(group.connectionId) ?? [];
+    list.push({
+      id: group.id,
+      relationType: group.relationType,
+      orderIndex: group.orderIndex,
+      nodes: dimensionsByGroup.get(group.id) ?? [],
+    });
+    groupsByConnection.set(group.connectionId, list);
+  }
+
+  const initialEdges: DimensionEdgeType[] = canvasConnections.map(
+    (connection) => ({
+      id: connection.id,
+      source: connection.fromNodeId,
+      target: connection.toNodeId,
+      type: "dimension",
+      data: {
+        groups: groupsByConnection.get(connection.id) ?? [],
+        sourceColor: initialNodes.find(
+          (node) => node.id === connection.fromNodeId,
+        )?.data.color,
+        targetColor: initialNodes.find(
+          (node) => node.id === connection.toNodeId,
+        )?.data.color,
+      },
+    }),
+  );
+
   return (
     <>
       <header className="page-head canvas-head">
@@ -89,7 +181,11 @@ export default async function CanvasPage({
         </div>
       </header>
 
-      <CanvasWorkspace initialNodes={initialNodes} />
+      <CanvasWorkspace
+        canvasId={canvas.id}
+        initialNodes={initialNodes}
+        initialEdges={initialEdges}
+      />
     </>
   );
 }

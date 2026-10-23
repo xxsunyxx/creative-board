@@ -42,12 +42,10 @@ try {
   await page.fill("#title", "M1 测试灵感");
   await page.fill("#content", "由 m1-check 写入，测试后删除。");
   await page.getByRole("button", { name: "添加灵感" }).click();
-  await page.waitForTimeout(900);
-
-  const inspirationVisible = await page
-    .getByText("M1 测试灵感", { exact: true })
-    .first()
-    .isVisible();
+  await page
+    .getByRole("heading", { name: "M1 测试灵感", exact: true })
+    .waitFor({ timeout: 6000 });
+  const inspirationVisible = true;
   const healthAfterInspiration = await (
     await fetch("http://localhost:3000/api/health")
   ).json();
@@ -62,12 +60,11 @@ try {
   await page.fill("#name", "M1 测试画布");
   await page.fill("#description", "测试后删除");
   await page.getByRole("button", { name: "新建画布" }).click();
-  await page.waitForTimeout(900);
+  await page
+    .getByRole("link", { name: "M1 测试画布", exact: true })
+    .waitFor({ timeout: 6000 });
 
-  const canvasVisible = await page
-    .getByText("M1 测试画布", { exact: true })
-    .first()
-    .isVisible();
+  const canvasVisible = true;
 
   await page
     .locator(".workspace-nav")
@@ -109,6 +106,7 @@ try {
   );
 } finally {
   const db = new Database("./data/app.db");
+  db.pragma("foreign_keys = ON");
   db.prepare("DELETE FROM inspirations WHERE title = ?").run("M1 测试灵感");
   db.prepare("DELETE FROM canvases WHERE name = ?").run("M1 测试画布");
   db.close();

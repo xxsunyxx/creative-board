@@ -1,31 +1,7 @@
-import Link from "next/link";
-import { WorkspaceNav } from "@/components/workspace-nav";
+import { WorkspaceShell } from "@/components/workspace-shell";
 
 export default function WorkspaceLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  return (
-    <div className="workspace">
-      <aside className="sidebar">
-        <Link href="/" className="sidebar-brand">
-          <span className="brand-mark">CB</span>
-          <span>
-            <strong>Creative Board</strong>
-            <small>M3 · 画布便签</small>
-          </span>
-        </Link>
-
-        <WorkspaceNav />
-
-        <div className="sidebar-footer">
-          <Link href="/m0" className="sidebar-m0">
-            M0 技术验证
-          </Link>
-          <span>本地 · 单用户</span>
-        </div>
-      </aside>
-
-      <main className="workspace-main">{children}</main>
-    </div>
-  );
+  return <WorkspaceShell>{children}</WorkspaceShell>;
 }

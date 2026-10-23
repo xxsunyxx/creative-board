@@ -24,6 +24,33 @@ export async function updateNodePosition(
     .run();
 }
 
+export async function updateNodePositions(
+  updates: { id: string; x: number; y: number }[],
+) {
+  if (updates.length === 0) {
+    return;
+  }
+
+  const now = new Date();
+
+  db.transaction((tx) => {
+    for (const update of updates) {
+      if (
+        !update.id ||
+        !Number.isFinite(update.x) ||
+        !Number.isFinite(update.y)
+      ) {
+        continue;
+      }
+
+      tx.update(canvasNodes)
+        .set({ x: update.x, y: update.y, updatedAt: now })
+        .where(eq(canvasNodes.id, update.id))
+        .run();
+    }
+  });
+}
+
 export async function updateNodeWeight(nodeId: string, weight: number) {
   if (!nodeId || !Number.isFinite(weight)) {
     return;

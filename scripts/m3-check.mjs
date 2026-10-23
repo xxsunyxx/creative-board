@@ -104,11 +104,21 @@ try {
   const node = page.locator(".canvas-node").first();
   const box = await node.boundingBox();
   if (!box) throw new Error("canvas node box missing");
-  await page.mouse.move(box.x + 100, box.y + 18);
+  const nodeTransformBefore = await page
+    .locator(".react-flow__node")
+    .first()
+    .getAttribute("style");
+  await page.mouse.move(box.x + 130, box.y + 85);
   await page.mouse.down();
-  await page.mouse.move(box.x + 170, box.y + 70, { steps: 14 });
+  await page.waitForTimeout(120);
+  await page.mouse.move(box.x + 210, box.y + 135, { steps: 20 });
+  await page.waitForTimeout(120);
   await page.mouse.up();
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
+  const nodeTransformAfter = await page
+    .locator(".react-flow__node")
+    .first()
+    .getAttribute("style");
   const afterDrag = readNode();
 
   await page.locator(".canvas-weight").fill("9");
@@ -172,6 +182,8 @@ try {
       {
         nodeCount,
         initial,
+        nodeTransformBefore,
+        nodeTransformAfter,
         afterDrag,
         afterWeight,
         afterColor,
