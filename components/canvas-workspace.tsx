@@ -718,6 +718,17 @@ function DimensionEdge({
         d={path}
         style={{ stroke: targetColor }}
       />
+      <circle r="2.4" fill={targetColor} opacity="0.88">
+        <animateMotion dur="2.8s" repeatCount="indefinite" path={path} />
+      </circle>
+      <circle r="1.6" fill={sourceColor} opacity="0.62">
+        <animateMotion
+          dur="3.8s"
+          repeatCount="indefinite"
+          begin="1.1s"
+          path={path}
+        />
+      </circle>
       <EdgeLabelRenderer>
         <div
           className="edge-endpoint"
