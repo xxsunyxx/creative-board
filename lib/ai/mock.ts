@@ -1,9 +1,9 @@
+import type { NoteRole } from "../canvas-types";
+
 export type KeywordInput = {
   title: string;
   content?: string | null;
-};
-
-export type MergeInput = KeywordInput & {
+};export type MergeInput = KeywordInput & {
   keywords: string[];
 };
 
@@ -586,5 +586,35 @@ export function generateDimensions(
 
     default:
       return genericDimensions(aTitle, bTitle);
+  }
+}
+
+export function inferNoteContent({
+  role,
+  incomingTitles,
+  outgoingTitles,
+  relationTypes,
+}: {
+  role: NoteRole;
+  incomingTitles: string[];
+  outgoingTitles: string[];
+  relationTypes: string[];
+}) {
+  const incoming = incomingTitles.filter(Boolean);
+  const outgoing = outgoingTitles.filter(Boolean);
+  const relation = relationTypes.find(Boolean) ?? "机制";
+
+  switch (role) {
+    case "inspiration":
+      return outgoing.length
+        ? `一个新灵感：围绕「${outgoing.join("、")}」，补一个前置条件、相关现象或缺失素材。`
+        : "一个新灵感：从一个具体现象、案例或问题开始。";
+    case "process":
+      return `过程：${incoming[0] ?? "起点"} 通过「${relation}」影响 ${outgoing[0] ?? "下一步"}。可以把中间机制再拆成 2-3 个环节。`;
+    case "result":
+      return `结果：综合「${incoming.join("、") || "已有材料"}」，可以收敛为：先提炼一句共同结论，再列出支撑它的 2-3 条证据。`;
+    case "blank":
+    default:
+      return "空便签：先连接前后节点，再点开始推理。";
   }
 }

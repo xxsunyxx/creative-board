@@ -12,10 +12,13 @@
     "check:m2": "node scripts/m2-check.mjs",
     "check:m3": "node scripts/m3-check.mjs",
     "check:m4": "node scripts/m4-check.mjs",
+    "check:m5": "node scripts/m5-check.mjs",
+    "check:settings": "node scripts/settings-check.mjs",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push --force",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",
+    "db:check": "node scripts/check-migrations.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

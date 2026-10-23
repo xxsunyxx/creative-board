@@ -1,5 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
+export type NoteRole = "inspiration" | "process" | "result" | "blank";
+
 export type CanvasNodeData = {
   title: string;
   content: string;
@@ -8,9 +10,11 @@ export type CanvasNodeData = {
   note: string;
   noteCount: number;
   sourceInspirationId: string | null;
+  role: NoteRole;
+  roleLocked: boolean;
 };
 
-export type CanvasNodeType = Node<CanvasNodeData, "inspiration">;
+export type CanvasNodeType = Node<CanvasNodeData, "note">;
 
 export type DimensionNodeData = {
   id: string;

@@ -68,24 +68,24 @@ export default async function CanvasPage({
     noteCounts.map((row) => [row.stickyNoteId, row.total]),
   );
 
-  const initialNodes: CanvasNodeType[] = nodes
-    .filter((node) => node.type === "inspiration")
-    .map((node) => ({
-      id: node.id,
-      type: "inspiration",
-      position: { x: node.x, y: node.y },
-      width: node.width,
-      height: node.height,
-      data: {
-        title: node.title,
-        content: node.content,
-        weight: node.weight,
-        color: node.color,
-        note: node.note,
-        noteCount: noteCountMap.get(node.id) ?? 0,
-        sourceInspirationId: node.sourceInspirationId,
-      },
-    }));
+  const initialNodes: CanvasNodeType[] = nodes.map((node) => ({
+    id: node.id,
+    type: "note",
+    position: { x: node.x, y: node.y },
+    width: node.width,
+    height: node.height,
+    data: {
+      title: node.title,
+      content: node.content,
+      weight: node.weight,
+      color: node.color,
+      note: node.note,
+      noteCount: noteCountMap.get(node.id) ?? 0,
+      sourceInspirationId: node.sourceInspirationId,
+      role: node.type,
+      roleLocked: node.roleLocked,
+    },
+  }));
 
   const activeNodeIds = new Set(initialNodes.map((node) => node.id));
   const canvasConnections = db
@@ -173,8 +173,7 @@ export default async function CanvasPage({
           </Link>
           <h1 className="page-title">{canvas.name}</h1>
           <p className="page-subtitle">
-            {canvas.description || "还没有说明。"} · {initialNodes.length}{" "}
-            个便签
+            {canvas.description || "还没有说明。"}
           </p>
         </div>
         <div className="stat-row">

@@ -51,6 +51,13 @@ import {
   deleteDimensionGroup,
   selectDimension,
 } from "@/lib/actions/edges";
+import {
+  createNote,
+  inferBlankNotes,
+  insertProcessOnConnection,
+  updateNoteContent,
+  updateNoteRole,
+} from "@/lib/actions/canvas";
 import type {
   CanvasNodeData,
   CanvasNodeType,
@@ -58,7 +65,9 @@ import type {
   DimensionEdgeType,
   DimensionGroupData,
   DimensionNodeData,
+  NoteRole,
 } from "@/lib/canvas-types";
+import { RELATION_TYPES } from "@/lib/ai/relations";
 import "@xyflow/react/dist/style.css";
 
 const palette = [
@@ -74,8 +83,11 @@ type CanvasActions = {
   updateWeight: (id: string, weight: number) => void;
   updateColor: (id: string, color: string) => void;
   resizeNode: (id: string, width: number, height: number) => void;
+  updateRole: (id: string, role: NoteRole) => void;
+  updateContent: (id: string, content: string) => Promise<void>;
   saveNote: (id: string, note: string) => Promise<number>;
   deleteNode: (id: string) => void;
+  insertProcess: (connectionId: string) => void;
   requestAddGroup: (connectionId: string) => void;
   selectDimension: (
     connectionId: string,
@@ -101,6 +113,9 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteDraft, setNoteDraft] = useState(data.note);
   const [savingNote, setSavingNote] = useState(false);
+  const [contentOpen, setContentOpen] = useState(false);
+  const [contentDraft, setContentDraft] = useState(data.content);
+  const [savingContent, setSavingContent] = useState(false);
 
   if (!actions) {
     return null;
@@ -122,9 +137,19 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
     }
   };
 
+  const commitContent = async () => {
+    setSavingContent(true);
+    try {
+      await actions.updateContent(id, contentDraft);
+      setContentOpen(false);
+    } finally {
+      setSavingContent(false);
+    }
+  };
+
   return (
     <div
-      className="canvas-node"
+      className={`canvas-node role-${data.role}`}
       style={{ "--node-color": data.color } as CSSProperties}
     >
       <Handle
@@ -225,31 +250,97 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
           </button>
         </div>
 
-        <p className="canvas-node-content nowheel">{data.content}</p>
-
-        <div className="canvas-node-footer">
-          <button
-            type="button"
-            className="node-note-button nodrag"
-            onClick={() => {
-              setNoteDraft(data.note);
-              setNoteOpen((open) => !open);
+        {contentOpen ? (
+          <div className="content-editor nodrag nowheel">
+            <textarea
+              className="content-textarea"
+              value={contentDraft}
+              onChange={(event) => setContentDraft(event.target.value)}
+              placeholder="写正文，或先留空等 AI 推理"
+              rows={4}
+            />
+            <div className="note-actions">
+              <button
+                type="button"
+                className="mini-button"
+                onClick={() => setContentOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="button-primary button-small"
+                onClick={commitContent}
+                disabled={savingContent}
+              >
+                {savingContent ? "保存中…" : "保存正文"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p
+            className="canvas-node-content nowheel"
+            title="双击编辑正文"
+            onDoubleClick={() => {
+              setContentDraft(data.content);
+              setContentOpen(true);
             }}
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+            {data.content ||
+              (data.role === "blank"
+                ? "空便签 · 摆好结构后点开始推理"
+                : "等待推理 · 双击编辑")}
+          </p>
+        )}
+
+        <div className="canvas-node-footer">
+          <select
+            className={`note-role-select role-${data.role} nodrag`}
+            value={data.role}
+            title="便签角色"
+            onChange={(event) =>
+              actions.updateRole(id, event.target.value as NoteRole)
+            }
+          >
+            <option value="inspiration">灵感</option>
+            <option value="process">过程</option>
+            <option value="result">结果</option>
+            <option value="blank">空白</option>
+          </select>
+          <div className="node-footer-actions">
+            <button
+              type="button"
+              className="node-note-button nodrag"
+              onClick={() => {
+                setContentDraft(data.content);
+                setContentOpen(true);
+              }}
             >
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
-            <span>备注 {data.noteCount}</span>
-          </button>
+              编辑
+            </button>
+            <button
+              type="button"
+              className="node-note-button nodrag"
+              onClick={() => {
+                setNoteDraft(data.note);
+                setNoteOpen((open) => !open);
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+              <span>备注 {data.noteCount}</span>
+            </button>
+          </div>
         </div>
 
         {paletteOpen && (
@@ -569,6 +660,36 @@ function DimensionGroupPanel({
         </button>
         <button
           type="button"
+          className="mini-button lucky-button"
+          onClick={() => {
+            const details = group.nodes.filter(
+              (node) => node.level !== "main",
+            );
+            const pool = details.length > 0 ? details : group.nodes;
+            const picked = pool[Math.floor(Math.random() * pool.length)];
+            if (picked) {
+              actions.selectDimension(
+                connectionId,
+                group.id,
+                picked.id,
+              );
+            }
+          }}
+        >
+          🎲 Lucky
+        </button>
+        <button
+          type="button"
+          className="mini-button"
+          onClick={() => {
+            actions.insertProcess(connectionId);
+            onClose();
+          }}
+        >
+          插入过程节点
+        </button>
+        <button
+          type="button"
           className="mini-button danger"
           onClick={() => {
             if (window.confirm(`删除「${group.relationType}」维度框？`)) {
@@ -814,8 +935,53 @@ function DimensionEdge({
   );
 }
 
-const nodeTypes = { inspiration: InspirationNode } as NodeTypes;
+const nodeTypes = { note: InspirationNode } as NodeTypes;
 const edgeTypes = { dimension: DimensionEdge } as EdgeTypes;
+
+const roleTitles: Record<NoteRole, string> = {
+  inspiration: "空灵感",
+  process: "过程",
+  result: "空结果",
+  blank: "空便签",
+};
+
+const defaultRoleTitles = new Set(Object.values(roleTitles));
+
+type NotePayload = {
+  id: string;
+  role: NoteRole;
+  title: string;
+  content: string;
+  weight: number;
+  color: string;
+  note: string;
+  roleLocked: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+function noteToCanvasNode(note: NotePayload): CanvasNodeType {
+  return {
+    id: note.id,
+    type: "note",
+    position: { x: note.x, y: note.y },
+    width: note.width,
+    height: note.height,
+    data: {
+      title: note.title,
+      content: note.content,
+      weight: note.weight,
+      color: note.color,
+      note: note.note,
+      noteCount: 0,
+      sourceInspirationId: null,
+      role: note.role,
+      roleLocked: note.roleLocked,
+    },
+  };
+}
 
 export default function CanvasWorkspace({
   canvasId,
@@ -832,6 +998,9 @@ export default function CanvasWorkspace({
     connectionId: string;
     mode: "new" | "add";
   } | null>(null);
+  const [insertRole, setInsertRole] = useState<NoteRole>("blank");
+  const [inferring, setInferring] = useState(false);
+  const [inferMessage, setInferMessage] = useState("");
   const flowRef =
     useRef<ReactFlowInstance<CanvasNodeType, DimensionEdgeType> | null>(null);
 
@@ -878,6 +1047,87 @@ export default function CanvasWorkspace({
       },
       resizeNode: (id, width, height) => {
         void updateNodeSize(id, width, height);
+      },
+      updateRole: (id, role) => {
+        setNodes((current) =>
+          current.map((node) =>
+            node.id === id
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    role,
+                    roleLocked: true,
+                    title: defaultRoleTitles.has(node.data.title)
+                      ? roleTitles[role]
+                      : node.data.title,
+                  },
+                }
+              : node,
+          ),
+        );
+        void updateNoteRole(id, role);
+      },
+      updateContent: async (id, content) => {
+        await updateNoteContent(id, content);
+        setNodes((current) =>
+          current.map((node) =>
+            node.id === id
+              ? { ...node, data: { ...node.data, content: content.trim() } }
+              : node,
+          ),
+        );
+      },
+      insertProcess: (connectionId) => {
+        void (async () => {
+          const result = await insertProcessOnConnection(connectionId);
+          if (!result) {
+            return;
+          }
+
+          setNodes((current) => [
+            ...current,
+            noteToCanvasNode(result.processNote),
+          ]);
+          setEdges((current) => {
+            const oldEdge = current.find(
+              (edge) => edge.id === connectionId,
+            );
+            if (!oldEdge) {
+              return current;
+            }
+            const oldData = oldEdge.data as
+              | DimensionEdgeData
+              | undefined;
+            const first: DimensionEdgeType = {
+              id: result.firstConnectionId,
+              source: oldEdge.source,
+              target: result.processNote.id,
+              type: "dimension",
+              data: {
+                groups: oldData?.groups ?? [],
+                sourceColor: oldData?.sourceColor,
+                targetColor: result.processNote.color,
+              },
+            };
+            const second: DimensionEdgeType = {
+              id: result.secondConnectionId,
+              source: result.processNote.id,
+              target: oldEdge.target,
+              type: "dimension",
+              data: {
+                groups: [],
+                sourceColor: result.processNote.color,
+                targetColor: oldData?.targetColor,
+              },
+            };
+            return [
+              ...current.filter((edge) => edge.id !== connectionId),
+              first,
+              second,
+            ];
+          });
+        })();
       },
       saveNote: async (id, note) => {
         const result = await saveNodeNote(id, note);
@@ -1026,7 +1276,10 @@ export default function CanvasWorkspace({
     })();
   };
 
-  const handlePickRelation = async (relationType: string) => {
+  const handlePickRelation = async (
+    relationType: string,
+    lucky = false,
+  ) => {
     if (!picker) {
       return;
     }
@@ -1037,6 +1290,31 @@ export default function CanvasWorkspace({
     );
 
     if (result) {
+      let groups = result.group;
+
+      if (lucky) {
+        const detailNodes = groups.nodes.filter(
+          (node) => node.level !== "main",
+        );
+        const pool = detailNodes.length > 0 ? detailNodes : groups.nodes;
+        const picked = pool[Math.floor(Math.random() * pool.length)];
+
+        if (picked) {
+          await selectDimension(
+            picker.connectionId,
+            groups.id,
+            picked.id,
+          );
+          groups = {
+            ...groups,
+            nodes: groups.nodes.map((node) => ({
+              ...node,
+              selected: node.id === picked.id,
+            })),
+          };
+        }
+      }
+
       setEdges((current) =>
         current.map((edge) => {
           if (edge.id !== picker.connectionId) {
@@ -1046,7 +1324,7 @@ export default function CanvasWorkspace({
           return {
             ...edge,
             data: {
-              groups: [...(edgeData?.groups ?? []), result.group],
+              groups: [...(edgeData?.groups ?? []), groups],
             },
           };
         }),
@@ -1134,6 +1412,66 @@ export default function CanvasWorkspace({
     }, 80);
   };
 
+  const handleInsertNote = () => {
+    void (async () => {
+      const position = flowRef.current?.screenToFlowPosition({
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+      }) ?? { x: 200, y: 200 };
+      const offset = nodes.length * 24;
+      const note = await createNote(
+        canvasId,
+        insertRole,
+        position.x + offset,
+        position.y + offset,
+      );
+
+      if (!note) {
+        return;
+      }
+
+      setNodes((current) => [...current, noteToCanvasNode(note)]);
+    })();
+  };
+
+  const handleInferAll = () => {
+    void (async () => {
+      setInferring(true);
+      setInferMessage("");
+
+      try {
+        const result = await inferBlankNotes(canvasId);
+        const updates = new Map(
+          result.updated.map((item) => [item.id, item]),
+        );
+
+        setNodes((current) =>
+          current.map((node) => {
+            const update = updates.get(node.id);
+            return update
+              ? {
+                  ...node,
+                  data: {
+                    ...node.data,
+                    role: update.role,
+                    content: update.content,
+                    roleLocked: update.roleLocked,
+                  },
+                }
+              : node;
+          }),
+        );
+        setInferMessage(
+          result.updated.length
+            ? `已推理 ${result.updated.length} 个空便签`
+            : "没有空便签",
+        );
+      } finally {
+        setInferring(false);
+      }
+    })();
+  };
+
   const pickerEdge = picker
     ? edges.find((edge) => edge.id === picker.connectionId)
     : null;
@@ -1161,6 +1499,43 @@ export default function CanvasWorkspace({
         >
           自动排布
         </button>
+
+        <div className="canvas-insert-bar">
+          <select
+            className="canvas-insert-select"
+            value={insertRole}
+            onChange={(event) =>
+              setInsertRole(event.target.value as NoteRole)
+            }
+            title="插入什么角色"
+          >
+            <option value="blank">空便签</option>
+            <option value="inspiration">空灵感</option>
+            <option value="process">空过程</option>
+            <option value="result">空结果</option>
+          </select>
+          <button
+            type="button"
+            className="canvas-tool"
+            onClick={handleInsertNote}
+          >
+            ＋ 插入
+          </button>
+          <button
+            type="button"
+            className="canvas-tool canvas-infer"
+            onClick={handleInferAll}
+            disabled={inferring}
+          >
+            {inferring ? "推理中…" : "开始推理"}
+          </button>
+          <span className="canvas-board-stats">
+            {nodes.length} 便签 · {edges.length} 连接
+          </span>
+          {inferMessage ? (
+            <span className="canvas-infer-status">{inferMessage}</span>
+          ) : null}
+        </div>
 
         <ReactFlow
           nodes={nodes}
@@ -1212,8 +1587,15 @@ export default function CanvasWorkspace({
           open={Boolean(picker)}
           mode={picker?.mode ?? "new"}
           context={pickerContext}
-          onSelect={(label) => {
-            void handlePickRelation(label);
+          onSelect={(label, lucky) => {
+            void handlePickRelation(label, lucky);
+          }}
+          onLucky={() => {
+            const type =
+              RELATION_TYPES[
+                Math.floor(Math.random() * RELATION_TYPES.length)
+              ];
+            void handlePickRelation(type.label, true);
           }}
           onCancel={handleCancelPicker}
         />

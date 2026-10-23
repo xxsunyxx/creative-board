@@ -90,9 +90,14 @@ export const canvasNodes = sqliteTable(
     canvasId: text("canvas_id")
       .notNull()
       .references(() => canvases.id, { onDelete: "cascade" }),
-    type: text("type", { enum: ["inspiration", "output"] })
+    type: text("type", {
+      enum: ["inspiration", "process", "result", "blank"],
+    })
       .notNull()
-      .default("inspiration"),
+      .default("blank"),
+    roleLocked: integer("role_locked", { mode: "boolean" })
+      .notNull()
+      .default(true),
     sourceInspirationId: text("source_inspiration_id").references(
       () => inspirations.id,
       { onDelete: "set null" },

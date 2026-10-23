@@ -10,12 +10,14 @@ export function RelationshipPicker({
   mode,
   context,
   onSelect,
+  onLucky,
   onCancel,
 }: {
   open: boolean;
   mode: "new" | "add";
   context: string;
-  onSelect: (label: string) => void;
+  onSelect: (label: string, lucky?: boolean) => void;
+  onLucky: () => void;
   onCancel: () => void;
 }) {
   if (!open) {
@@ -80,6 +82,13 @@ export function RelationshipPicker({
         </section>
 
         <div className="modal-actions">
+          <button
+            type="button"
+            className="mini-button lucky-button"
+            onClick={onLucky}
+          >
+            🎲 Lucky
+          </button>
           <button type="button" className="mini-button" onClick={onCancel}>
             取消
           </button>

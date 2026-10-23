@@ -132,13 +132,16 @@ try {
   await page.waitForTimeout(600);
   const afterColor = readNode();
 
-  await page.locator(".node-note-button").click();
+  const noteButton = page
+    .locator(".node-note-button")
+    .filter({ hasText: "备注" });
+  await noteButton.click();
   await page.locator(".note-textarea").fill("M3 测试备注 1");
   await page.getByRole("button", { name: "保存备注" }).click();
   await page.waitForSelector(".note-editor", { state: "detached" });
   await page.waitForTimeout(600);
   const afterNote = readNode();
-  const noteButtonText = await page.locator(".node-note-button").innerText();
+  const noteButtonText = await noteButton.innerText();
 
   await page.locator(".react-flow__node").first().click({
     position: { x: 140, y: 90 },

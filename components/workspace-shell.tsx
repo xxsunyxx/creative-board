@@ -66,6 +66,9 @@ export function WorkspaceShell({
         <WorkspaceNav />
 
         <div className="sidebar-footer">
+          <Link href="/settings" className="sidebar-settings">
+            AI 设置
+          </Link>
           <Link href="/m0" className="sidebar-m0">
             M0 技术验证
           </Link>
