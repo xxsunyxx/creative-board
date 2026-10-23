@@ -108,7 +108,7 @@ page.on("pageerror", (error) => {
 function readState() {
   const read = new Database("./data/app.db", { readonly: true });
   const node = read
-    .prepare("select content from canvas_nodes where id = ?")
+    .prepare("select title, content, selected_question from canvas_nodes where id = ?")
     .get(nodeId);
   const docs = read
     .prepare("select id, title, content from documents where output_node_id = ?")
@@ -137,6 +137,19 @@ try {
   await page.locator(".result-panel").waitFor();
   const initialValue = await page.locator(".result-textarea").inputValue();
 
+  await page
+    .locator(".result-panel")
+    .getByRole("button", { name: "生成候选问题" })
+    .click();
+  await page.locator(".result-question").first().waitFor({ timeout: 10000 });
+  const questionCount = await page.locator(".result-question").count();
+  await page.locator(".result-question").first().click();
+  await page.waitForTimeout(600);
+  const questionState = readState();
+  const selectedQuestion = await page
+    .locator(".result-selected-question")
+    .innerText();
+
   await page.locator(".result-textarea").fill("新的结果正文，带一个中间机制。");
   await page.getByRole("button", { name: "保存正文" }).click();
   await page.locator(".result-panel").waitFor({ state: "detached" });
@@ -163,7 +176,11 @@ try {
     JSON.stringify(
       {
         initialValue,
+        questionCount,
+        selectedQuestion,
+        selectedQuestionInDb: questionState.node?.selected_question ?? null,
         savedContent: afterSave.node?.content ?? null,
+        savedQuestion: afterSave.node?.selected_question ?? null,
         documentCount: afterExport.docs.length,
         documentId,
         documentContent: afterExport.docs[0]?.content ?? "",

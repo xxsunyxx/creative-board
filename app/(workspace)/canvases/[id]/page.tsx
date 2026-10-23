@@ -85,6 +85,7 @@ export default async function CanvasPage({
       sourceInspirationId: node.sourceInspirationId,
       role: node.type,
       roleLocked: node.roleLocked,
+      selectedQuestion: node.selectedQuestion,
     },
   }));
 

@@ -12,6 +12,7 @@ export type CanvasNodeData = {
   sourceInspirationId: string | null;
   role: NoteRole;
   roleLocked: boolean;
+  selectedQuestion?: string | null;
 };
 
 export type CanvasNodeType = Node<CanvasNodeData, "note">;

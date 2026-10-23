@@ -128,6 +128,24 @@ export async function updateNoteContent(nodeId: string, content: string) {
   return { ok: true };
 }
 
+export async function setNodeSelectedQuestion(
+  nodeId: string,
+  question: string,
+) {
+  if (!nodeId) {
+    return { ok: false };
+  }
+
+  const next = question.trim() || null;
+
+  db.update(canvasNodes)
+    .set({ selectedQuestion: next, updatedAt: new Date() })
+    .where(eq(canvasNodes.id, nodeId))
+    .run();
+
+  return { ok: true, selectedQuestion: next };
+}
+
 export async function insertProcessOnConnection(connectionId: string) {
   const connection = db
     .select()

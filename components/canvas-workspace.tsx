@@ -413,11 +413,24 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
             {data.role === "result" ? (
               <button
                 type="button"
-                className="node-note-button nodrag"
+                className="node-icon-button nodrag"
                 onClick={() => actions.openResult(id)}
                 title="打开结果输出面板"
+                aria-label="输出"
               >
-                输出
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+                  <path d="m5.6 5.6 2.1 2.1M16.3 16.3l2.1 2.1" />
+                  <path d="m18.4 5.6-2.1 2.1M7.7 16.3l-2.1 2.1" />
+                </svg>
               </button>
             ) : null}
             <button
@@ -2073,9 +2086,26 @@ export default function CanvasWorkspace({
 
         {resultNode ? (
           <ResultPanel
+            nodeId={resultNode.id}
             title={resultNode.data.title}
             content={resultNode.data.content}
             role={resultRoleLabel}
+            initialQuestion={resultNode.data.selectedQuestion ?? null}
+            onQuestionSelected={(question) => {
+              setNodes((current) =>
+                current.map((node) =>
+                  node.id === resultNode.id
+                    ? {
+                        ...node,
+                        data: {
+                          ...node.data,
+                          selectedQuestion: question,
+                        },
+                      }
+                    : node,
+                ),
+              );
+            }}
             onSave={async (content) => {
               await actions.updateContent(resultNode.id, content);
               setResultPanelId(null);

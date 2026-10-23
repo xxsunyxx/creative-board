@@ -1616,10 +1616,11 @@ button {
   flex-direction: column;
   gap: 6px;
   margin: 8px 0;
+  overflow-y: auto;
 }
 
 .content-textarea {
-  min-height: 70px;
+  min-height: 52px;
   flex: 1;
   resize: vertical;
   padding: 8px 9px;
@@ -2464,6 +2465,104 @@ button {
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.result-questions {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid #e2e8f0;
+  border-radius: 13px;
+  background: #f8fafc;
+}
+
+.result-questions-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.result-questions-head > div {
+  display: grid;
+  gap: 3px;
+}
+
+.result-questions-head small {
+  color: #94a3b8;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.result-question-list {
+  display: grid;
+  gap: 6px;
+}
+
+.result-question {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.55;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.result-question:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.result-question.is-selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.result-question small {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.result-questions-empty {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 11.5px;
+}
+
+.result-selected-question {
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.result-question-meta {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.result-question-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .result-textarea {
