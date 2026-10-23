@@ -238,26 +238,12 @@ button {
 
 .edge-endpoint {
   z-index: 60;
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border: 2px solid #ffffff;
   border-radius: 50%;
-  box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.5),
-    0 2px 6px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.2);
   pointer-events: none;
-  animation: endpoint-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes endpoint-pulse {
-  0%,
-  100% {
-    scale: 1;
-  }
-
-  50% {
-    scale: 1.18;
-  }
 }
 
 .dimension-chip {
@@ -1483,36 +1469,10 @@ button {
   box-shadow: 0 0 0 3px
     color-mix(in srgb, var(--node-color, #3b82f6) 16%, transparent);
   opacity: 0.78;
-  animation: handle-pulse 2.8s ease-in-out infinite;
   transition:
     opacity 150ms ease,
     box-shadow 150ms ease,
     transform 150ms ease;
-}
-
-.canvas-handle-right {
-  animation-delay: 0.4s;
-}
-
-.canvas-handle-bottom {
-  animation-delay: 0.8s;
-}
-
-.canvas-handle-left {
-  animation-delay: 1.2s;
-}
-
-@keyframes handle-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--node-color, #3b82f6) 16%, transparent);
-  }
-
-  50% {
-    box-shadow: 0 0 0 8px
-      color-mix(in srgb, var(--node-color, #3b82f6) 0%, transparent);
-  }
 }
 
 .canvas-node:hover .canvas-handle {
