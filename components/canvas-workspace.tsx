@@ -319,7 +319,9 @@ function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
             <option value="inspiration">灵感</option>
             <option value="process">过程</option>
             <option value="result">结果</option>
-            <option value="blank">空白</option>
+            {!data.sourceInspirationId ? (
+              <option value="blank">空白</option>
+            ) : null}
           </select>
           <div className="node-footer-actions">
             {!data.sourceInspirationId ? (

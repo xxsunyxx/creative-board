@@ -153,6 +153,9 @@ try {
   const sourceIconCount = await sourceNode
     .locator(".node-icon-button")
     .count();
+  const sourceRoleOptions = await sourceNode
+    .locator(".note-role-select option")
+    .allInnerTexts();
   const note = page
     .locator(".react-flow__node")
     .filter({
@@ -166,6 +169,10 @@ try {
     path: "C:\\temp\\opencode\\note-actions.png",
     fullPage: true,
   });
+
+  const manualRoleOptions = await note
+    .locator(".note-role-select option")
+    .allInnerTexts();
 
   await note.getByRole("button", { name: "存入灵感库" }).click();
   await page.getByText(/已存入灵感库|灵感库已有/).waitFor({ timeout: 10000 });
@@ -198,6 +205,8 @@ try {
       {
         iconCount,
         sourceIconCount,
+        manualRoleOptions,
+        sourceRoleOptions,
         afterSave: Boolean(afterSave.inspiration),
         savedInspirationId,
         afterSaveAgainDocumentCount: afterSaveAgain.documents.length,
