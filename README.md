@@ -2,34 +2,46 @@
 
 一个私有的 AI 创意 / 研究工作台：灵感库收集和融合素材，画布上用连接线和维度框建立多层关系，输出节点生成结果，最后沉淀为 Markdown 文档。
 
-当前阶段：**M0 画布技术验证已通过**。React Flow 方案可行，准备进入 M1。
+当前阶段：**M1 项目骨架已通过**。下一步 M2：灵感库的关键词、融合、发送到画布。
 
 ## 本地运行
 
 ```bash
 pnpm install
+pnpm db:push
+pnpm db:seed
 pnpm dev
 ```
 
 打开 http://localhost:3000。
 
-## M0 验证
+首次运行需要 `db:push` + `db:seed`；已有 `data/app.db` 时 seed 会自动跳过。
 
-先保持 dev server 运行，再执行：
+## 页面
+
+- `/inspirations`：灵感库（读取 + 新增）
+- `/canvases`：画布列表（读取 + 新建）
+- `/documents`：文档列表 + Markdown 详情
+- `/api/health`：数据库计数
+- `/m0`：M0 画布技术验证
+
+## 验证
 
 ```bash
+pnpm typecheck
+pnpm build
 pnpm check:m0
+pnpm check:m1
 ```
 
-脚本会用本机 Chrome / Edge 跑一遍：
+`check:m0` / `check:m1` 需要 dev server 正在运行，并会调用本机 Chrome / Edge；可用 `CHROME_PATH` 指定浏览器路径。
 
-- 节点 / 连线 / 多维度 chip 渲染
-- chip 打开 popover、选择细节回写
-- 拖动节点 chip 跟随
-- 缩放 / 平移
-- 动态追加维度 chip
+## 数据库
 
-Chrome 路径可以用 `CHROME_PATH` 环境变量指定。
+- SQLite 文件：`data/app.db`（不进 Git）
+- Schema：`lib/db/schema.ts`
+- 迁移：`drizzle/`
+- 命令：`db:generate` / `db:push` / `db:migrate` / `db:seed` / `db:studio`
 
 ## 计划与讨论
 
@@ -37,7 +49,7 @@ Chrome 路径可以用 `CHROME_PATH` 环境变量指定。
 
 ## 技术栈
 
-- Next.js 16 + React 19 + TypeScript
-- React Flow（`@xyflow/react`）
-- SQLite + Drizzle（M1 接入）
-- AI provider 可切换，M0 阶段用 mock
+- Next.js 16.4 + React 19.3 + TypeScript
+- React Flow（`@xyflow/react` 12.12）
+- SQLite + Drizzle ORM 0.45
+- AI provider 可切换，当前阶段用 mock

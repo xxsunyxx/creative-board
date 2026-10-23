@@ -2,7 +2,8 @@ node_modules/
 .next/
 out/
 dist/
-data/
+data/*
+!data/.gitkeep
 .env
 .env.local
 .env.*.local

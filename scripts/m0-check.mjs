@@ -35,7 +35,7 @@ page.on("requestfailed", (request) => {
   );
 });
 
-await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
+await page.goto("http://localhost:3000/m0", { waitUntil: "networkidle" });
 await page.waitForSelector(".react-flow__node", { timeout: 10000 });
 await page.waitForTimeout(500);
 
