@@ -1,4 +1,5 @@
-import { count, desc } from "drizzle-orm";
+import { count, desc, isNull } from "drizzle-orm";
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { canvasNodes, canvases } from "@/lib/db/schema";
 import { createCanvas } from "./actions";
@@ -19,6 +20,7 @@ export default function CanvasesPage() {
   const nodeCounts = db
     .select({ canvasId: canvasNodes.canvasId, total: count() })
     .from(canvasNodes)
+    .where(isNull(canvasNodes.deletedAt))
     .groupBy(canvasNodes.canvasId)
     .all();
 
@@ -33,7 +35,7 @@ export default function CanvasesPage() {
           <p className="page-kicker">Canvas Workspace</p>
           <h1 className="page-title">画布</h1>
           <p className="page-subtitle">
-            每个画布是一块独立的思考空间。M3 会接入便签、连接线和维度框。
+            每个画布是一块独立的思考空间。打开画布编辑便签、权重、颜色和备注。
           </p>
         </div>
         <div className="stat-row">
@@ -86,7 +88,9 @@ export default function CanvasesPage() {
                   {nodeCountMap.get(row.id) ?? 0} 个节点
                 </span>
               </div>
-              <h2>{row.name}</h2>
+              <h2>
+                <Link href={`/canvases/${row.id}`}>{row.name}</Link>
+              </h2>
               <p>{row.description || "还没有说明。"}</p>
               <div className="tag-row">
                 {(row.colorLegend ?? []).map((group) => (
@@ -101,7 +105,9 @@ export default function CanvasesPage() {
               </div>
               <div className="card-meta">
                 <time>{formatDate(row.updatedAt)}</time>
-                <span className="muted">打开画布将在 M3 接入</span>
+                <Link href={`/canvases/${row.id}`} className="text-link">
+                  打开画布 →
+                </Link>
               </div>
             </article>
           ))}

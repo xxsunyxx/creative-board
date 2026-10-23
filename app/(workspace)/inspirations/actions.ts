@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { extractKeywords, mergeInspirations } from "@/lib/ai/mock";
 import { db } from "@/lib/db";
@@ -239,7 +239,12 @@ export async function sendToCanvas(formData: FormData) {
     db
       .select({ value: count() })
       .from(canvasNodes)
-      .where(eq(canvasNodes.canvasId, canvasId))
+      .where(
+        and(
+          eq(canvasNodes.canvasId, canvasId),
+          isNull(canvasNodes.deletedAt),
+        ),
+      )
       .get()?.value ?? 0;
 
   db.insert(canvasNodes)

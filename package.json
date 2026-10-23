@@ -10,6 +10,7 @@
     "check:m0": "node scripts/m0-check.mjs",
     "check:m1": "node scripts/m1-check.mjs",
     "check:m2": "node scripts/m2-check.mjs",
+    "check:m3": "node scripts/m3-check.mjs",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push --force",
     "db:migrate": "drizzle-kit migrate",

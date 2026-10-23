@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import {
   canvases,
   inspirationKeywords,
+  inspirationNotes,
   inspirations,
 } from "@/lib/db/schema";
 import {
@@ -50,6 +51,19 @@ export default function InspirationsPage() {
     const list = keywordMap.get(row.inspirationId) ?? [];
     list.push({ id: row.id, keyword: row.keyword });
     keywordMap.set(row.inspirationId, list);
+  }
+
+  const noteRows = db
+    .select()
+    .from(inspirationNotes)
+    .orderBy(desc(inspirationNotes.createdAt))
+    .all();
+  const noteMap = new Map<string, typeof noteRows>();
+
+  for (const note of noteRows) {
+    const list = noteMap.get(note.inspirationId) ?? [];
+    list.push(note);
+    noteMap.set(note.inspirationId, list);
   }
 
   const canvasRows = db
@@ -187,6 +201,22 @@ export default function InspirationsPage() {
               </div>
               <h2>{row.title}</h2>
               <p>{row.content || "暂无内容"}</p>
+
+              {(noteMap.get(row.id) ?? []).length > 0 ? (
+                <details className="note-history">
+                  <summary>
+                    备注 {noteMap.get(row.id)?.length}（同步自画布）
+                  </summary>
+                  <div className="note-history-list">
+                    {(noteMap.get(row.id) ?? []).map((note) => (
+                      <p key={note.id}>
+                        <time>{formatDate(note.createdAt)}</time>
+                        <span>{note.content}</span>
+                      </p>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
 
               <div className="keyword-row">
                 {(keywordMap.get(row.id) ?? []).map((keyword) => (
