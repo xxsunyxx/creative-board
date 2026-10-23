@@ -64,6 +64,32 @@ export async function updateNodeWeight(nodeId: string, weight: number) {
     .run();
 }
 
+export async function updateNodeSize(
+  nodeId: string,
+  width: number,
+  height: number,
+) {
+  if (
+    !nodeId ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height)
+  ) {
+    return;
+  }
+
+  const nextWidth = Math.max(180, Math.min(520, Math.round(width)));
+  const nextHeight = Math.max(120, Math.min(480, Math.round(height)));
+
+  db.update(canvasNodes)
+    .set({
+      width: nextWidth,
+      height: nextHeight,
+      updatedAt: new Date(),
+    })
+    .where(eq(canvasNodes.id, nodeId))
+    .run();
+}
+
 export async function updateNodeColor(nodeId: string, color: string) {
   if (!nodeId || !/^#[0-9a-f]{6}$/i.test(color)) {
     return;

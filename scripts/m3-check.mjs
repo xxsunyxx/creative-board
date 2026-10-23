@@ -36,7 +36,7 @@ function readNode() {
   const node = canvas
     ? db
         .prepare(
-          `SELECT id, x, y, weight, color, note, deleted_at
+          `SELECT id, x, y, width, height, weight, color, note, deleted_at
            FROM canvas_nodes
            WHERE canvas_id = ?
            ORDER BY created_at DESC
@@ -97,6 +97,7 @@ try {
   await page.waitForURL(/\/canvases\/[^/]+$/);
   await page.waitForSelector(".canvas-node", { timeout: 10000 });
   await page.waitForTimeout(400);
+  const canvasUrl = page.url();
 
   const initial = readNode();
   const nodeCount = await page.locator(".canvas-node").count();
@@ -139,11 +140,41 @@ try {
   const afterNote = readNode();
   const noteButtonText = await page.locator(".node-note-button").innerText();
 
-  await page
-    .locator(".workspace-nav")
-    .getByRole("link", { name: /灵感库/ })
-    .click();
-  await page.waitForURL("**/inspirations");
+  await page.locator(".react-flow__node").first().click({
+    position: { x: 140, y: 90 },
+  });
+  await page.waitForTimeout(400);
+
+  const resizeHandles = page.locator(".canvas-resize-handle");
+  const handleCount = await resizeHandles.count();
+  let resizeBox = null;
+
+  for (let index = 0; index < handleCount; index += 1) {
+    const candidate = await resizeHandles.nth(index).boundingBox();
+    if (candidate && (!resizeBox || candidate.x + candidate.y > resizeBox.x + resizeBox.y)) {
+      resizeBox = candidate;
+    }
+  }
+
+  if (!resizeBox) throw new Error("resize handle missing");
+  await page.mouse.move(
+    resizeBox.x + resizeBox.width / 2,
+    resizeBox.y + resizeBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    resizeBox.x + resizeBox.width / 2 + 60,
+    resizeBox.y + resizeBox.height / 2 + 40,
+    { steps: 14 },
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(700);
+  const afterResize = readNode();
+
+  await page.goto("http://localhost:3000/inspirations", {
+    waitUntil: "networkidle",
+  });
+  await page.waitForTimeout(300);
   const sourceNoteCard = page.locator(".inspiration-card").filter({
     has: page.getByRole("heading", { name: "远程办公", exact: true }),
   });
@@ -154,15 +185,7 @@ try {
     .getByText("M3 测试备注 1", { exact: true })
     .isVisible();
 
-  await page
-    .locator(".workspace-nav")
-    .getByRole("link", { name: /画布/ })
-    .click();
-  await page.waitForURL("**/canvases");
-  await page
-    .getByRole("link", { name: "M3 测试画布", exact: true })
-    .click();
-  await page.waitForURL(/\/canvases\/[^/]+$/);
+  await page.goto(canvasUrl, { waitUntil: "networkidle" });
   await page.waitForSelector(".canvas-node", { timeout: 10000 });
   await page.waitForTimeout(400);
 
@@ -189,6 +212,7 @@ try {
         afterColor,
         afterNote,
         noteButtonText,
+        afterResize,
         syncedNoteSummaryVisible,
         syncedNoteVisible,
         afterDelete,
@@ -201,6 +225,9 @@ try {
         noteSaved:
           afterNote.node.note === "M3 测试备注 1" &&
           afterNote.noteCount === 1,
+        resizeSaved:
+          afterResize.node.width !== initial.node.width ||
+          afterResize.node.height !== initial.node.height,
         deleteSaved: afterDelete.node?.deleted_at !== null,
         logs,
       },

@@ -14,7 +14,7 @@ export function WorkspaceShell({
   const isCanvas =
     pathname.startsWith("/canvases/") && pathname !== "/canvases";
   const [collapsed, setCollapsed] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
+  const [focusMode, setFocusMode] = useState(isCanvas);
 
   useEffect(() => {
     setCollapsed(
@@ -23,8 +23,8 @@ export function WorkspaceShell({
   }, []);
 
   useEffect(() => {
-    setFocusMode(false);
-  }, [pathname]);
+    setFocusMode(isCanvas);
+  }, [isCanvas]);
 
   const toggleCollapsed = () => {
     setCollapsed((current) => {

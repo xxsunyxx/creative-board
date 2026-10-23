@@ -74,6 +74,8 @@ export default async function CanvasPage({
       id: node.id,
       type: "inspiration",
       position: { x: node.x, y: node.y },
+      width: node.width,
+      height: node.height,
       data: {
         title: node.title,
         content: node.content,

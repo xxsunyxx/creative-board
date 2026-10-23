@@ -194,6 +194,7 @@ try {
     .click();
   await page.waitForTimeout(700);
   const edgeCount = await page.locator(".react-flow__edge").count();
+  const endpointCount = await page.locator(".edge-endpoint").count();
   const statsAfterBranch = readStats(testCanvas.id);
 
   await page.getByRole("button", { name: "自动排布" }).click();
@@ -206,6 +207,11 @@ try {
   );
   const dbPositionsAfterLayout = readPositions(testCanvas.id);
 
+  const defaultFocusMode =
+    (await page.locator(".workspace.is-focus").count()) === 1;
+
+  await page.getByRole("button", { name: "退出全屏" }).click();
+  await page.waitForTimeout(300);
   await page.locator(".sidebar-toggle").click();
   await page.waitForTimeout(300);
   const sidebarCollapsed =
@@ -250,9 +256,11 @@ try {
         firstChipText,
         statsAfterSecondGroup,
         edgeCount,
+        endpointCount,
         statsAfterBranch,
         positionsAfterLayout,
         dbPositionsAfterLayout,
+        defaultFocusMode,
         sidebarCollapsed,
         focusMode,
         statsAfterDelete,

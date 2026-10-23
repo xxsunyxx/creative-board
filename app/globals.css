@@ -220,6 +220,46 @@ button {
   opacity: 0.12;
 }
 
+.dimension-edge-flow {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 2 14;
+  opacity: 0.5;
+  pointer-events: none;
+  animation: edge-flow 1.6s linear infinite;
+}
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+
+.edge-endpoint {
+  z-index: 60;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.5),
+    0 2px 6px rgba(15, 23, 42, 0.18);
+  pointer-events: none;
+  animation: endpoint-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes endpoint-pulse {
+  0%,
+  100% {
+    scale: 1;
+  }
+
+  50% {
+    scale: 1.18;
+  }
+}
+
 .dimension-chip {
   display: inline-flex;
   align-items: center;
@@ -1188,127 +1228,160 @@ button {
 
 .canvas-node {
   position: relative;
-  width: 264px;
-  padding: 15px 14px 12px;
-  border: 2px solid;
-  border-radius: 18px;
-  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  width: 100%;
+  height: 100%;
+}
+
+.canvas-note-paper {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  padding: 12px 13px 10px;
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--node-color, #f59e0b) 24%, #dbe3ee);
+  border-radius: 12px;
+  background: color-mix(
+    in srgb,
+    var(--node-color, #f59e0b) 14%,
+    #fffdf7
+  );
   box-shadow:
-    0 14px 36px rgba(15, 23, 42, 0.13),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  transition:
-    border-width 120ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    inset 0 3px 0 color-mix(in srgb, var(--node-color, #f59e0b) 55%, transparent),
+    0 10px 24px rgba(15, 23, 42, 0.08);
+  transition: box-shadow 160ms ease;
 }
 
-.canvas-node:hover {
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
-  transform: translateY(-1px);
-}
-
-.canvas-node-accent {
-  position: absolute;
-  top: 0;
-  right: 16px;
-  left: 16px;
-  height: 3px;
-  border-radius: 0 0 4px 4px;
-  opacity: 0.88;
+.canvas-node:hover .canvas-note-paper {
+  box-shadow:
+    inset 0 3px 0 color-mix(in srgb, var(--node-color, #f59e0b) 65%, transparent),
+    0 14px 30px rgba(15, 23, 42, 0.12);
 }
 
 .canvas-node-top {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 7px;
 }
 
 .canvas-color-button {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   flex: 0 0 auto;
   padding: 0;
-  border: 2px solid #ffffff;
+  border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  box-shadow: 0 0 0 2px #e2e8f0;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.1);
 }
 
 .canvas-node-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  font-size: 15px;
-  font-weight: 750;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .canvas-weight {
-  width: 38px;
-  height: 27px;
+  width: 34px;
+  height: 25px;
   padding: 0 3px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.58);
+  color: #1f2937;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 700;
 }
 
 .canvas-weight:focus {
-  border-color: #93c5fd;
-  outline: 2px solid rgba(37, 99, 235, 0.2);
+  border-color: rgba(37, 99, 235, 0.45);
+  outline: 2px solid rgba(37, 99, 235, 0.16);
   outline-offset: 1px;
 }
 
 .canvas-node-content {
-  max-height: 100px;
-  margin: 10px 0 11px;
+  flex: 1;
+  min-height: 0;
+  margin: 9px 0 10px;
   overflow: auto;
-  color: #475569;
-  font-size: 12.8px;
-  line-height: 1.6;
+  color: #334155;
+  font-size: 12.5px;
+  line-height: 1.55;
 }
 
 .canvas-node-footer {
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  margin-top: auto;
 }
 
 .node-note-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 999px;
-  background: #f8fafc;
-  color: #64748b;
+  background: rgba(255, 255, 255, 0.5);
+  color: #475569;
   font-size: 10.5px;
 }
 
+.node-note-button svg {
+  width: 11px;
+  height: 11px;
+}
+
 .node-note-button:hover {
-  border-color: #93c5fd;
+  border-color: rgba(37, 99, 235, 0.4);
   color: #1d4ed8;
 }
 
 .node-action {
   display: grid;
-  width: 24px;
-  height: 24px;
+  width: 23px;
+  height: 23px;
   place-items: center;
   padding: 0;
   border: 0;
   border-radius: 7px;
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.38);
   color: #64748b;
   font-size: 12px;
+}
+
+.node-action svg {
+  width: 13px;
+  height: 13px;
 }
 
 .node-action:hover {
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.canvas-resize-handle {
+  width: 9px !important;
+  height: 9px !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 3px !important;
+}
+
+.canvas-resize-line {
+  border-color: color-mix(
+    in srgb,
+    var(--node-color, #3b82f6) 40%,
+    transparent
+  ) !important;
 }
 
 .color-palette {
@@ -1402,17 +1475,44 @@ button {
 }
 
 .canvas-handle {
+  z-index: 30;
   width: 12px;
   height: 12px;
   border: 2px solid #ffffff;
   background: var(--node-color, #3b82f6);
   box-shadow: 0 0 0 3px
     color-mix(in srgb, var(--node-color, #3b82f6) 16%, transparent);
-  opacity: 0.68;
+  opacity: 0.78;
+  animation: handle-pulse 2.8s ease-in-out infinite;
   transition:
     opacity 150ms ease,
     box-shadow 150ms ease,
     transform 150ms ease;
+}
+
+.canvas-handle-right {
+  animation-delay: 0.4s;
+}
+
+.canvas-handle-bottom {
+  animation-delay: 0.8s;
+}
+
+.canvas-handle-left {
+  animation-delay: 1.2s;
+}
+
+@keyframes handle-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--node-color, #3b82f6) 16%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px
+      color-mix(in srgb, var(--node-color, #3b82f6) 0%, transparent);
+  }
 }
 
 .canvas-node:hover .canvas-handle {
@@ -1421,7 +1521,7 @@ button {
 
 .canvas-handle:hover {
   transform: scale(1.25);
-  box-shadow: 0 0 0 5px
+  box-shadow: 0 0 0 6px
     color-mix(in srgb, var(--node-color, #3b82f6) 22%, transparent);
 }
 

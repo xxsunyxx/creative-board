@@ -259,8 +259,8 @@ export async function sendToCanvas(formData: FormData) {
       color: nodeColors[nodeCount % nodeColors.length],
       x: 80 + (nodeCount % 3) * 460,
       y: 80 + Math.floor(nodeCount / 3) * 300,
-      width: 240,
-      height: 160,
+      width: 280,
+      height: 200,
     })
     .run();
 

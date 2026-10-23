@@ -8,9 +8,11 @@ import {
   EdgeLabelRenderer,
   Handle,
   MiniMap,
+  NodeResizer,
   Position,
   ReactFlow,
   useEdgesState,
+  useInternalNode,
   useNodesState,
   type Connection as FlowConnection,
   type EdgeProps,
@@ -38,6 +40,7 @@ import {
   updateNodeColor,
   updateNodePosition,
   updateNodePositions,
+  updateNodeSize,
   updateNodeWeight,
 } from "@/lib/actions/canvas";
 import {
@@ -70,6 +73,7 @@ const palette = [
 type CanvasActions = {
   updateWeight: (id: string, weight: number) => void;
   updateColor: (id: string, color: string) => void;
+  resizeNode: (id: string, width: number, height: number) => void;
   saveNote: (id: string, note: string) => Promise<number>;
   deleteNode: (id: string) => void;
   requestAddGroup: (connectionId: string) => void;
@@ -90,7 +94,7 @@ type CanvasActions = {
 
 const CanvasActionsContext = createContext<CanvasActions | null>(null);
 
-function InspirationNode({ id, data }: NodeProps<CanvasNodeType>) {
+function InspirationNode({ id, data, selected }: NodeProps<CanvasNodeType>) {
   const actions = useContext(CanvasActionsContext);
   const [weight, setWeight] = useState(data.weight);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -121,149 +125,213 @@ function InspirationNode({ id, data }: NodeProps<CanvasNodeType>) {
   return (
     <div
       className="canvas-node"
-      style={{
-        borderColor: data.color,
-        borderWidth: 2 + Math.round((data.weight - 1) / 2),
-        "--node-color": data.color,
-      } as CSSProperties}
+      style={{ "--node-color": data.color } as CSSProperties}
     >
       <Handle
         type="source"
         position={Position.Top}
         id="top"
-        className="canvas-handle"
+        className="canvas-handle canvas-handle-top"
       />
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className="canvas-handle canvas-handle-source"
+        className="canvas-handle canvas-handle-source canvas-handle-right"
         title="拖到另一个便签上建立连接"
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="bottom"
-        className="canvas-handle"
+        className="canvas-handle canvas-handle-bottom"
       />
       <Handle
         type="source"
         position={Position.Left}
         id="left"
-        className="canvas-handle"
+        className="canvas-handle canvas-handle-left"
       />
 
-      <div className="canvas-node-accent" style={{ background: data.color }} />
+      <NodeResizer
+        isVisible={selected}
+        minWidth={180}
+        minHeight={120}
+        maxWidth={520}
+        maxHeight={480}
+        color={data.color}
+        handleClassName="canvas-resize-handle"
+        lineClassName="canvas-resize-line"
+        onResizeEnd={(_, params) =>
+          actions.resizeNode(id, params.width, params.height)
+        }
+      />
 
-      <div className="canvas-node-top">
-        <button
-          type="button"
-          className="canvas-color-button nodrag"
-          style={{ background: data.color }}
-          onClick={() => setPaletteOpen((open) => !open)}
-          title="更换颜色"
-          aria-label="更换颜色"
-        />
-        <span className="canvas-node-title">{data.title}</span>
-        <input
-          className="canvas-weight nodrag"
-          type="number"
-          min={1}
-          max={9}
-          value={weight}
-          title="权重 1-9"
-          onChange={(event) => setWeight(Number(event.target.value))}
-          onBlur={commitWeight}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="node-action node-delete nodrag"
-          onClick={() => {
-            if (window.confirm("删除这个便签？灵感库条目会保留。")) {
-              actions.deleteNode(id);
-            }
-          }}
-          title="删除便签"
-          aria-label="删除便签"
-        >
-          🗑
-        </button>
-      </div>
+      <div
+        className="canvas-note-paper"
+        style={{ borderWidth: 1 + Math.round((data.weight - 1) / 3) }}
+      >
 
-      <p className="canvas-node-content nowheel">{data.content}</p>
-
-      <div className="canvas-node-footer">
-        <button
-          type="button"
-          className="node-note-button nodrag"
-          onClick={() => {
-            setNoteDraft(data.note);
-            setNoteOpen((open) => !open);
-          }}
-        >
-          ✎ 备注 {data.noteCount}
-        </button>
-      </div>
-
-      {paletteOpen && (
-        <div className="color-palette nodrag">
-          {palette.map((color) => (
-            <button
-              key={color}
-              type="button"
-              className={`color-swatch ${
-                color === data.color ? "is-selected" : ""
-              }`}
-              style={{ background: color }}
-              onClick={() => {
-                actions.updateColor(id, color);
-                setPaletteOpen(false);
-              }}
-              title={color}
-              aria-label={`颜色 ${color}`}
-            />
-          ))}
-        </div>
-      )}
-
-      {noteOpen && (
-        <div className="note-editor nodrag nowheel">
-          <textarea
-            className="note-textarea"
-            value={noteDraft}
-            onChange={(event) => setNoteDraft(event.target.value)}
-            placeholder="写一条备注，保存后会追加到灵感文字里"
-            rows={3}
+        <div className="canvas-node-top">
+          <button
+            type="button"
+            className="canvas-color-button nodrag"
+            style={{ background: data.color }}
+            onClick={() => setPaletteOpen((open) => !open)}
+            title="更换颜色"
+            aria-label="更换颜色"
           />
-          <div className="note-actions">
-            <button
-              type="button"
-              className="mini-button"
-              onClick={() => setNoteOpen(false)}
+          <span className="canvas-node-title">{data.title}</span>
+          <input
+            className="canvas-weight nodrag"
+            type="number"
+            min={1}
+            max={9}
+            value={weight}
+            title="权重 1-9"
+            onChange={(event) => setWeight(Number(event.target.value))}
+            onBlur={commitWeight}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="node-action node-delete nodrag"
+            onClick={() => {
+              if (window.confirm("删除这个便签？灵感库条目会保留。")) {
+                actions.deleteNode(id);
+              }
+            }}
+            title="删除便签"
+            aria-label="删除便签"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              取消
-            </button>
-            <button
-              type="button"
-              className="button-primary button-small"
-              onClick={commitNote}
-              disabled={savingNote}
-            >
-              {savingNote ? "保存中…" : "保存备注"}
-            </button>
-          </div>
+              <path d="M3 6h18" />
+              <path d="M8 6V4h8v2" />
+              <path d="M19 6l-1 14H6L5 6" />
+              <path d="M10 11v5M14 11v5" />
+            </svg>
+          </button>
         </div>
-      )}
+
+        <p className="canvas-node-content nowheel">{data.content}</p>
+
+        <div className="canvas-node-footer">
+          <button
+            type="button"
+            className="node-note-button nodrag"
+            onClick={() => {
+              setNoteDraft(data.note);
+              setNoteOpen((open) => !open);
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+            <span>备注 {data.noteCount}</span>
+          </button>
+        </div>
+
+        {paletteOpen && (
+          <div className="color-palette nodrag">
+            {palette.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`color-swatch ${
+                  color === data.color ? "is-selected" : ""
+                }`}
+                style={{ background: color }}
+                onClick={() => {
+                  actions.updateColor(id, color);
+                  setPaletteOpen(false);
+                }}
+                title={color}
+                aria-label={`颜色 ${color}`}
+              />
+            ))}
+          </div>
+        )}
+
+        {noteOpen && (
+          <div className="note-editor nodrag nowheel">
+            <textarea
+              className="note-textarea"
+              value={noteDraft}
+              onChange={(event) => setNoteDraft(event.target.value)}
+              placeholder="写一条备注，保存后会追加到灵感文字里"
+              rows={3}
+            />
+            <div className="note-actions">
+              <button
+                type="button"
+                className="mini-button"
+                onClick={() => setNoteOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="button-primary button-small"
+                onClick={commitNote}
+                disabled={savingNote}
+              >
+                {savingNote ? "保存中…" : "保存备注"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 type Point = { x: number; y: number };
+type Box = { x: number; y: number; width: number; height: number };
+
+function perimeterPoint(box: Box, toward: Point): Point {
+  const center = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  const dx = toward.x - center.x;
+  const dy = toward.y - center.y;
+
+  if (dx === 0 && dy === 0) {
+    return center;
+  }
+
+  const scaleX =
+    dx === 0 ? Number.POSITIVE_INFINITY : box.width / 2 / Math.abs(dx);
+  const scaleY =
+    dy === 0 ? Number.POSITIVE_INFINITY : box.height / 2 / Math.abs(dy);
+  const scale = Math.min(scaleX, scaleY);
+
+  return {
+    x: center.x + dx * scale,
+    y: center.y + dy * scale,
+  };
+}
 
 function cubicPoint(
   p0: Point,
@@ -531,6 +599,8 @@ function DimensionGroupPanel({
 function DimensionEdge({
   id,
   data,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -539,12 +609,57 @@ function DimensionEdge({
 }: EdgeProps<DimensionEdgeType>) {
   const actions = useContext(CanvasActionsContext);
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const sourceNode = useInternalNode<CanvasNodeType>(source);
+  const targetNode = useInternalNode<CanvasNodeType>(target);
   const groups = data?.groups ?? [];
-  const p0 = { x: sourceX, y: sourceY };
-  const p3 = { x: targetX, y: targetY };
-  const dx = Math.max(70, Math.abs(targetX - sourceX) * 0.55);
-  const c1 = { x: sourceX + dx, y: sourceY };
-  const c2 = { x: targetX - dx, y: targetY };
+
+  const sourceBox = sourceNode
+    ? {
+        x: sourceNode.internals.positionAbsolute.x,
+        y: sourceNode.internals.positionAbsolute.y,
+        width: sourceNode.measured?.width ?? sourceNode.width ?? 280,
+        height: sourceNode.measured?.height ?? sourceNode.height ?? 200,
+      }
+    : null;
+  const targetBox = targetNode
+    ? {
+        x: targetNode.internals.positionAbsolute.x,
+        y: targetNode.internals.positionAbsolute.y,
+        width: targetNode.measured?.width ?? targetNode.width ?? 280,
+        height: targetNode.measured?.height ?? targetNode.height ?? 200,
+      }
+    : null;
+
+  const sourceCenter = sourceBox
+    ? {
+        x: sourceBox.x + sourceBox.width / 2,
+        y: sourceBox.y + sourceBox.height / 2,
+      }
+    : null;
+  const targetCenter = targetBox
+    ? {
+        x: targetBox.x + targetBox.width / 2,
+        y: targetBox.y + targetBox.height / 2,
+      }
+    : null;
+
+  const p0 =
+    sourceBox && targetCenter
+      ? perimeterPoint(sourceBox, targetCenter)
+      : { x: sourceX, y: sourceY };
+  const p3 =
+    targetBox && sourceCenter
+      ? perimeterPoint(targetBox, sourceCenter)
+      : { x: targetX, y: targetY };
+  const dx = p3.x - p0.x;
+  const dy = p3.y - p0.y;
+  const horizontal = Math.abs(dx) >= Math.abs(dy);
+  const c1 = horizontal
+    ? { x: p0.x + dx * 0.45, y: p0.y }
+    : { x: p0.x, y: p0.y + dy * 0.45 };
+  const c2 = horizontal
+    ? { x: p3.x - dx * 0.45, y: p3.y }
+    : { x: p3.x, y: p3.y - dy * 0.45 };
   const path = `M ${p0.x},${p0.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${p3.x},${p3.y}`;
 
   const chipPositions = groups.map((_, index) => {
@@ -598,7 +713,39 @@ function DimensionEdge({
         style={{ stroke: `url(#${gradientId})` }}
         markerEnd={`url(#${markerId})`}
       />
+      <path
+        className="dimension-edge-flow"
+        d={path}
+        style={{ stroke: targetColor }}
+      />
+      <circle r="2.6" fill={targetColor} opacity="0.9">
+        <animateMotion dur="2.8s" repeatCount="indefinite" path={path} />
+      </circle>
+      <circle r="1.8" fill={sourceColor} opacity="0.7">
+        <animateMotion
+          dur="3.8s"
+          repeatCount="indefinite"
+          begin="1.1s"
+          path={path}
+        />
+      </circle>
       <EdgeLabelRenderer>
+        <div
+          className="edge-endpoint"
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${p0.x}px, ${p0.y}px)`,
+            background: sourceColor,
+          }}
+        />
+        <div
+          className="edge-endpoint"
+          style={{
+            position: "absolute",
+            transform: `translate(-50%, -50%) translate(${p3.x}px, ${p3.y}px)`,
+            background: targetColor,
+          }}
+        />
         {groups.map((group, index) => {
           const position = chipPositions[index];
           const isOpen = openGroupId === group.id;
@@ -728,6 +875,9 @@ export default function CanvasWorkspace({
           ),
         );
         void updateNodeColor(id, color);
+      },
+      resizeNode: (id, width, height) => {
+        void updateNodeSize(id, width, height);
       },
       saveNote: async (id, note) => {
         const result = await saveNodeNote(id, note);
