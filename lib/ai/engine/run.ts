@@ -69,12 +69,12 @@ function addUsage(first: TokenUsage, second: TokenUsage): TokenUsage {
   };
 }
 
-function contentNeedsRewrite(
+function contentIssue(
   content: string,
   context: ReturnType<typeof buildInferenceContext>,
 ) {
   if (/(维度|入线|出线|关系类型|已选维度)/.test(content)) {
-    return true;
+    return "正文出现了「维度 / 入线 / 出线 / 关系类型」这类系统词";
   }
 
   const focusPhrases = [
@@ -82,9 +82,29 @@ function contentNeedsRewrite(
     ...context.outgoing,
   ].flatMap((neighbor) => neighbor.edge.selectedPaths);
 
-  return focusPhrases.some(
-    (phrase) => phrase.length >= 3 && content.includes(phrase),
-  );
+  if (
+    focusPhrases.some(
+      (phrase) => phrase.length >= 3 && content.includes(phrase),
+    )
+  ) {
+    return "正文原样复述了提示词里的维度短语";
+  }
+
+  if (context.node.role === "result") {
+    if (/(任何一种|必然|一定会|所有都|完全不会|从不)/.test(content)) {
+      return "结果用了绝对化表达，缺少条件或边界";
+    }
+
+    if (
+      !/(因为|所以|因此|但|如果|当|取决于|意味着|导致|通过|才|否则|反而)/.test(
+        content,
+      )
+    ) {
+      return "结果缺少中间机制或条件，像直接喊结论";
+    }
+  }
+
+  return null;
 }
 
 export function getCanvasTokenTotal(canvasId: string) {
@@ -250,10 +270,9 @@ export async function runInference(
             });
           }
 
-          if (
-            input.provider !== "mock" &&
-            contentNeedsRewrite(output.content, context)
-          ) {
+          const issue = contentIssue(output.content, context);
+
+          if (input.provider !== "mock" && issue) {
             const firstOutput = output;
             const focusList = [
               ...context.incoming,
@@ -269,9 +288,13 @@ export async function runInference(
                 apiKey: input.apiKey,
                 model: input.model,
                 system: buildSystemPrompt(role),
-                user: `${buildUserPrompt(context)}\n\n上一版把提示词里的维度名或系统词写进了正文。请保留判断，但重写成自然语言：不要出现「维度」「入线」「出线」「关系类型」。${
+                user: `${buildUserPrompt(context)}\n\n上一版的问题：${issue}。请保留判断，但重写成自然语言：不要出现「维度」「入线」「出线」「关系类型」。${
                   focusList
                     ? `也不要原样复述「${focusList}」这类角度短语。`
+                    : ""
+                }${
+                  role === "result"
+                    ? "结果必须至少包含一个中间机制或条件，读起来像一段有前因后果的论证，而不是口号。"
                     : ""
                 }`,
                 context,
