@@ -40,6 +40,12 @@ function sanitize(text: string, apiKey: string) {
   return safe.slice(0, 500).replace(/\s+/g, " ").trim();
 }
 
+function humanizeContent(value: string) {
+  return value
+    .replace(/^(结论|结果|过程|灵感)[:：]\s*/u, "")
+    .trim();
+}
+
 function parseModelJson(text: string): ProviderOutput {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = fenced?.[1] ?? text;
@@ -61,8 +67,9 @@ function parseModelJson(text: string): ProviderOutput {
     throw new ProviderError("模型返回的 JSON 无法解析");
   }
 
-  const content =
+  const rawContent =
     typeof parsed.content === "string" ? parsed.content.trim() : "";
+  const content = humanizeContent(rawContent);
 
   if (content.length < 5) {
     throw new ProviderError("模型没有返回有效内容");
@@ -272,12 +279,14 @@ export async function callProvider(
       ...input.context.incoming,
       ...input.context.outgoing,
     ].flatMap((neighbor) => neighbor.edge.relationTypes);
-    const content = inferNoteContent({
-      role: input.context.node.role,
-      incomingTitles: input.context.incoming.map((item) => item.title),
-      outgoingTitles: input.context.outgoing.map((item) => item.title),
-      relationTypes,
-    });
+    const content = humanizeContent(
+      inferNoteContent({
+        role: input.context.node.role,
+        incomingTitles: input.context.incoming.map((item) => item.title),
+        outgoingTitles: input.context.outgoing.map((item) => item.title),
+        relationTypes,
+      }),
+    );
 
     return {
       content: input.context.hint

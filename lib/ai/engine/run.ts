@@ -61,6 +61,32 @@ function isFatalProviderError(error: unknown) {
   );
 }
 
+function addUsage(first: TokenUsage, second: TokenUsage): TokenUsage {
+  return {
+    inputTokens: first.inputTokens + second.inputTokens,
+    outputTokens: first.outputTokens + second.outputTokens,
+    totalTokens: first.totalTokens + second.totalTokens,
+  };
+}
+
+function contentNeedsRewrite(
+  content: string,
+  context: ReturnType<typeof buildInferenceContext>,
+) {
+  if (/(维度|入线|出线|关系类型|已选维度)/.test(content)) {
+    return true;
+  }
+
+  const focusPhrases = [
+    ...context.incoming,
+    ...context.outgoing,
+  ].flatMap((neighbor) => neighbor.edge.selectedPaths);
+
+  return focusPhrases.some(
+    (phrase) => phrase.length >= 3 && content.includes(phrase),
+  );
+}
+
 export function getCanvasTokenTotal(canvasId: string) {
   const row = db
     .select({
@@ -222,6 +248,41 @@ export async function runInference(
               user: `${buildUserPrompt(context)}\n\n注意：只输出一个合法的 JSON 对象。`,
               context,
             });
+          }
+
+          if (
+            input.provider !== "mock" &&
+            contentNeedsRewrite(output.content, context)
+          ) {
+            const firstOutput = output;
+            const focusList = [
+              ...context.incoming,
+              ...context.outgoing,
+            ]
+              .flatMap((neighbor) => neighbor.edge.selectedPaths)
+              .filter(Boolean)
+              .join("」「");
+
+            try {
+              const rewritten = await callProvider({
+                provider: input.provider,
+                apiKey: input.apiKey,
+                model: input.model,
+                system: buildSystemPrompt(role),
+                user: `${buildUserPrompt(context)}\n\n上一版把提示词里的维度名或系统词写进了正文。请保留判断，但重写成自然语言：不要出现「维度」「入线」「出线」「关系类型」。${
+                  focusList
+                    ? `也不要原样复述「${focusList}」这类角度短语。`
+                    : ""
+                }`,
+                context,
+              });
+              output = {
+                ...rewritten,
+                usage: addUsage(firstOutput.usage, rewritten.usage),
+              };
+            } catch {
+              output = firstOutput;
+            }
           }
 
           const content = output.content.trim().slice(0, 1200);
